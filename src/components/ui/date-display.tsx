@@ -23,14 +23,19 @@ export const DateDisplay: React.FC<DateDisplayProps> = ({
   const getFormattedDate = () => {
     if (!date) return fallback;
     
-    switch (format) {
-      case 'datetime':
-        return formatDateTimeForUser(date);
-      case 'custom':
-        return customFormat ? formatDateForUser(date, customFormat) : formatDateForUser(date);
-      case 'date':
-      default:
-        return formatDateForUser(date);
+    try {
+      switch (format) {
+        case 'datetime':
+          return formatDateTimeForUser(date);
+        case 'custom':
+          return customFormat ? formatDateForUser(date, customFormat) : formatDateForUser(date);
+        case 'date':
+        default:
+          return formatDateForUser(date);
+      }
+    } catch (error) {
+      console.error('Error in DateDisplay:', error, 'Date input:', date);
+      return fallback;
     }
   };
 

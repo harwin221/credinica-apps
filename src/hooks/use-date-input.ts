@@ -86,9 +86,18 @@ export const useDateInput = (options: UseDateInputOptions = {}) => {
       return;
     }
     
-    const formatted = formatDateForUser(isoString, 'yyyy-MM-dd');
-    setDisplayValue(formatted);
-    setError(null);
+    try {
+      const formatted = formatDateForUser(isoString, 'yyyy-MM-dd');
+      if (formatted && formatted !== 'N/A' && formatted !== 'Fecha Inválida') {
+        setDisplayValue(formatted);
+        setError(null);
+      } else {
+        clear();
+      }
+    } catch (error) {
+      console.error('Error setting date from ISO:', error, 'Input:', isoString);
+      clear();
+    }
   }, [clear]);
   
   return {

@@ -2,20 +2,42 @@
 
 import { query } from '@/lib/mysql';
 import type { CreditDetail, AppUser, RegisteredPayment, Client, Payment, PercentPaidItem, CreditStatus, RejectionAnalysisItem, ProvisionCredit } from '@/lib/types';
-import { format, startOfDay, endOfDay, isAfter, parseISO } from 'date-fns';
-import { toZonedTime, fromZonedTime } from 'date-fns-tz';
-import { toISOString, nowInNicaragua, todayInNicaragua, isoToMySQLDateTime } from '@/lib/date-utils';
+import { format, isAfter } from 'date-fns';
+import { toISOString, nowInNicaragua, todayInNicaragua, isoToMySQLDateTime, formatDateForUser } from '@/lib/date-utils';
 import * as XLSX from 'xlsx';
 import { calculateAveragePaymentDelay, calculateCreditStatusDetails, getProvisionCategory, PROVISION_RULES } from '@/lib/utils';
 import { getCredit } from './credit-service-server';
 
 export interface ReportFilters {
-  sucursales?: string[];
-  users?: string[];
-  dateFrom?: string;
-  dateTo?: string;
-  viewType?: 'summary' | 'detailed';
+    sucursales?: string[];
+    users?: string[];
+    dateFrom?: string;
+    dateTo?: string;
+    viewType?: 'summary' | 'detailed';
 }
+
+// --- Funciones auxiliares para manejo de fechas en reportes ---
+const getReportDateStart = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+        // Asegurar que la fecha se interprete como local de Nicaragua
+        return `${dateStr} 00:00:00`;
+    } catch (error) {
+        console.error('Error parsing start date:', error);
+        return '';
+    }
+};
+
+const getReportDateEnd = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+        // Asegurar que la fecha se interprete como local de Nicaragua
+        return `${dateStr} 23:59:59`;
+    } catch (error) {
+        console.error('Error parsing end date:', error);
+        return '';
+    }
+};
 
 // --- Type Definitions ---
 export interface DisbursementItem {
@@ -57,44 +79,44 @@ export interface FutureInstallmentsReportData {
 
 
 export interface SaldosCarteraItem {
-  creditId: string; creditNumber: string; clientName: string; clientNumber?: string; remainingBalance: number; remainingPrincipal: number; remainingInterest: number; installmentAmount: number; sucursalName: string; supervisorName: string; gestorName: string;
+    creditId: string; creditNumber: string; clientName: string; clientNumber?: string; remainingBalance: number; remainingPrincipal: number; remainingInterest: number; installmentAmount: number; sucursalName: string; supervisorName: string; gestorName: string;
 }
 export interface SaldosCarteraSummaryItem {
-  gestorName: string; creditCount: number; totalBalance: number; totalInstallment: number;
+    gestorName: string; creditCount: number; totalBalance: number; totalInstallment: number;
 }
 export interface ColocacionRecuperacionItem {
-  userName: string; recuperacion: number; colocacion: number; diferencia: number; desembolsos: number; sucursalName: string; supervisorName: string; ultimaCuota?: string;
+    userName: string; recuperacion: number; colocacion: number; diferencia: number; desembolsos: number; sucursalName: string; supervisorName: string; ultimaCuota?: string;
 }
 export interface PaymentDetailItem {
-  transactionNumber: string;
-  paymentDate: string;
-  clientName: string;
-  clientCode: string;
-  gestorName: string;
-  paidAmount: number;
-  capitalPaid: number;
-  interestPaid: number;
-  currency: string;
+    transactionNumber: string;
+    paymentDate: string;
+    clientName: string;
+    clientCode: string;
+    gestorName: string;
+    paidAmount: number;
+    capitalPaid: number;
+    interestPaid: number;
+    currency: string;
 }
 
 export interface PaymentDetailSummaryItem {
-  gestorName: string;
-  paymentCount: number;
-  totalPaid: number;
+    gestorName: string;
+    paymentCount: number;
+    totalPaid: number;
 }
 
 export interface PaymentDetailReportData {
-  detailed: PaymentDetailItem[];
-  summary: PaymentDetailSummaryItem[];
-  stats: {
-    totalPaid: number;
-    dueTodayCapital: number;
-    dueTodayInterest: number;
-    overdue: number;
-    expired: number;
-    advance: number;
-    totalClients: number;
-  };
+    detailed: PaymentDetailItem[];
+    summary: PaymentDetailSummaryItem[];
+    stats: {
+        totalPaid: number;
+        dueTodayCapital: number;
+        dueTodayInterest: number;
+        overdue: number;
+        expired: number;
+        advance: number;
+        totalClients: number;
+    };
 }
 
 export interface ExpiredCreditItem {
@@ -180,7 +202,7 @@ export async function generateSaldosCarteraReport(filters: ReportFilters): Promi
         WHERE c.status = 'Active'
     `;
     const params: any[] = [];
-    
+
     if (filters.sucursales && filters.sucursales.length > 0) {
         const sucursalPlaceholders = filters.sucursales.map(() => '?').join(',');
         const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursalPlaceholders})`, filters.sucursales);
@@ -191,7 +213,7 @@ export async function generateSaldosCarteraReport(filters: ReportFilters): Promi
             params.push(...sucursalNames);
         }
     }
-    
+
     if (filters.users && filters.users.length > 0) {
         const userPlaceholders = filters.users.map(() => '?').join(',');
         const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${userPlaceholders})`, filters.users);
@@ -234,21 +256,17 @@ export async function generateSaldosCarteraReport(filters: ReportFilters): Promi
 
 export async function generateColocacionVsRecuperacionReport(filters: ReportFilters): Promise<ColocacionRecuperacionItem[]> {
     const { dateFrom, dateTo, sucursales, users } = filters;
-    const timeZone = 'America/Managua';
 
-    const getUTCStart = (dateStr: string) => fromZonedTime(startOfDay(parseISO(dateStr)), timeZone);
-    const getUTCEnd = (dateStr: string) => fromZonedTime(endOfDay(parseISO(dateStr)), timeZone);
-    
     let userNamesToFilter: string[] = [];
     if (users && users.length > 0) {
         const placeholders = users.map(() => '?').join(',');
         const userNamesResult: any[] = await query(`SELECT fullName FROM users WHERE id IN (${placeholders})`, users);
         userNamesToFilter = userNamesResult.map(u => u.fullName);
     }
-    
+
     const allUsersSql = `SELECT id, fullName, sucursal_name, supervisor_name FROM users WHERE active = true`;
     let userRows: any[] = await query(allUsersSql, []);
-    
+
     if (sucursales && sucursales.length > 0) {
         const placeholders = sucursales.map(() => '?').join(',');
         const sucursalNamesResult: any[] = await query(`SELECT name FROM sucursales WHERE id IN (${placeholders})`, sucursales);
@@ -272,13 +290,13 @@ export async function generateColocacionVsRecuperacionReport(filters: ReportFilt
 
     let recuperacionSql = `SELECT pr.managedBy, SUM(pr.amount) as total, MAX(pr.paymentDate) as lastDate FROM payments_registered pr WHERE pr.status != 'ANULADO'`;
     const recuperacionParams: any[] = [];
-    if (dateFrom) { recuperacionSql += ' AND pr.paymentDate >= ?'; recuperacionParams.push(getUTCStart(dateFrom)); }
-    if (dateTo) { recuperacionSql += ' AND pr.paymentDate <= ?'; recuperacionParams.push(getUTCEnd(dateTo)); }
+    if (dateFrom) { recuperacionSql += ' AND pr.paymentDate >= ?'; recuperacionParams.push(getReportDateStart(dateFrom)); }
+    if (dateTo) { recuperacionSql += ' AND pr.paymentDate <= ?'; recuperacionParams.push(getReportDateEnd(dateTo)); }
     recuperacionSql += ' GROUP BY pr.managedBy';
     const recuperacionRows: any[] = await query(recuperacionSql, recuperacionParams);
-    
+
     recuperacionRows.forEach(row => {
-        if(reportMap[row.managedBy]) {
+        if (reportMap[row.managedBy]) {
             reportMap[row.managedBy].recuperacion = row.total;
             reportMap[row.managedBy].ultimaCuota = toISOString(row.lastDate) || '';
         }
@@ -286,18 +304,18 @@ export async function generateColocacionVsRecuperacionReport(filters: ReportFilt
 
     let colocacionSql = `SELECT collectionsManager, SUM(principalAmount) as total, COUNT(id) as count FROM credits WHERE status IN ('Active', 'Paid')`;
     const colocacionParams: any[] = [];
-    if (dateFrom) { colocacionSql += ' AND deliveryDate >= ?'; colocacionParams.push(getUTCStart(dateFrom)); }
-    if (dateTo) { colocacionSql += ' AND deliveryDate <= ?'; colocacionParams.push(getUTCEnd(dateTo)); }
+    if (dateFrom) { colocacionSql += ' AND deliveryDate >= ?'; colocacionParams.push(getReportDateStart(dateFrom)); }
+    if (dateTo) { colocacionSql += ' AND deliveryDate <= ?'; colocacionParams.push(getReportDateEnd(dateTo)); }
     colocacionSql += ' GROUP BY collectionsManager';
     const colocacionRows: any[] = await query(colocacionSql, colocacionParams);
-    
+
     colocacionRows.forEach(row => {
-         if(reportMap[row.collectionsManager]) {
+        if (reportMap[row.collectionsManager]) {
             reportMap[row.collectionsManager].colocacion = row.total;
             reportMap[row.collectionsManager].desembolsos = row.count;
         }
     });
-    
+
     let finalReport = Object.values(reportMap);
     finalReport.forEach(item => item.diferencia = item.colocacion - item.recuperacion);
 
@@ -310,7 +328,7 @@ export async function generateColocacionVsRecuperacionReport(filters: ReportFilt
 
 
 export async function generatePercentPaidReport(filters: ReportFilters): Promise<PercentPaidItem[]> {
-  let sql = `
+    let sql = `
     SELECT
       c.id as creditId,
       c.creditNumber,
@@ -330,32 +348,32 @@ export async function generatePercentPaidReport(filters: ReportFilters): Promise
     ) p ON c.id = p.creditId
     WHERE c.status = 'Active' AND c.totalAmount > 0
   `;
-  const params: any[] = [];
-  
-  if (filters.sucursales && filters.sucursales.length > 0) {
-    const sucursalPlaceholders = filters.sucursales.map(() => '?').join(',');
-    const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursalPlaceholders})`, filters.sucursales);
-    if (Array.isArray(sucursalNamesResult) && sucursalNamesResult.length > 0) {
-        const sucursalNames = sucursalNamesResult.map(s => s.name);
-        const namePlaceholders = sucursalNames.map(() => '?').join(',');
-        sql += ` AND c.branchName IN (${namePlaceholders})`;
-        params.push(...sucursalNames);
-    }
-  }
+    const params: any[] = [];
 
-  if (filters.users && filters.users.length > 0) {
-    const userPlaceholders = filters.users.map(() => '?').join(',');
-    const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${userPlaceholders})`, filters.users);
-    if (Array.isArray(userNamesResult) && userNamesResult.length > 0) {
-        const userNames = userNamesResult.map(u => u.fullName);
-        const namePlaceholders = userNames.map(() => '?').join(',');
-        sql += ` AND c.collectionsManager IN (${namePlaceholders})`;
-        params.push(...userNames);
+    if (filters.sucursales && filters.sucursales.length > 0) {
+        const sucursalPlaceholders = filters.sucursales.map(() => '?').join(',');
+        const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursalPlaceholders})`, filters.sucursales);
+        if (Array.isArray(sucursalNamesResult) && sucursalNamesResult.length > 0) {
+            const sucursalNames = sucursalNamesResult.map(s => s.name);
+            const namePlaceholders = sucursalNames.map(() => '?').join(',');
+            sql += ` AND c.branchName IN (${namePlaceholders})`;
+            params.push(...sucursalNames);
+        }
     }
-  }
-  
-  const results = await query(sql, params);
-  return results as PercentPaidItem[];
+
+    if (filters.users && filters.users.length > 0) {
+        const userPlaceholders = filters.users.map(() => '?').join(',');
+        const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${userPlaceholders})`, filters.users);
+        if (Array.isArray(userNamesResult) && userNamesResult.length > 0) {
+            const userNames = userNamesResult.map(u => u.fullName);
+            const namePlaceholders = userNames.map(() => '?').join(',');
+            sql += ` AND c.collectionsManager IN (${namePlaceholders})`;
+            params.push(...userNames);
+        }
+    }
+
+    const results = await query(sql, params);
+    return results as PercentPaidItem[];
 }
 
 export async function generateNonRenewedReport(filters: ReportFilters): Promise<NonRenewedCreditItem[]> {
@@ -396,7 +414,7 @@ export async function generateNonRenewedReport(filters: ReportFilters): Promise<
     if (paidCredits.length === 0) return [];
 
     const clientIds = [...new Set(paidCredits.map(c => c.clientId))];
-    
+
     if (clientIds.length === 0) return [];
 
     const placeholders = clientIds.map(() => '?').join(',');
@@ -427,7 +445,7 @@ export async function generateProvisioningReport(): Promise<ProvisionCredit[]> {
     for (const credit of credits) {
         const payments: any[] = await query(`SELECT * FROM payments_registered WHERE creditId = ? AND status != 'ANULADO'`, [credit.id]);
         const paymentPlan: any[] = await query(`SELECT * FROM payment_plan WHERE creditId = ?`, [credit.id]);
-        
+
         const fullCreditDetails: CreditDetail = {
             ...credit,
             paymentPlan,
@@ -458,11 +476,9 @@ export async function generateOverdueCreditsReport(filters: ReportFilters): Prom
     const { sucursales, users, dateTo } = filters;
     const timeZone = 'America/Managua';
 
-    // Si se proporciona dateTo, usa el final de ese día en la zona horaria de Managua.
-    // De lo contrario, usa la fecha y hora actual en Managua.
-    const asOfDate = dateTo
-        ? fromZonedTime(endOfDay(parseISO(dateTo)), timeZone)
-        : toZonedTime(new Date(), timeZone);
+    // Si se proporciona dateTo, usa el final de ese día.
+    // De lo contrario, usa la fecha y hora actual.
+    const asOfDate = dateTo ? `${dateTo} 23:59:59` : nowInNicaragua();
 
     let creditsSql = `
         SELECT 
@@ -477,25 +493,25 @@ export async function generateOverdueCreditsReport(filters: ReportFilters): Prom
     const params: any[] = [];
 
     if (sucursales && sucursales.length > 0) {
-        const sucursalNamesResult: any[] = await query(`SELECT name FROM sucursales WHERE id IN (${sucursales.map(()=>'?').join(',')})`, [...sucursales]);
+        const sucursalNamesResult: any[] = await query(`SELECT name FROM sucursales WHERE id IN (${sucursales.map(() => '?').join(',')})`, [...sucursales]);
         if (sucursalNamesResult.length > 0) {
             const sucursalNames = sucursalNamesResult.map(s => s.name);
-            creditsSql += ` AND c.branchName IN (${sucursalNames.map(()=>'?').join(',')})`;
+            creditsSql += ` AND c.branchName IN (${sucursalNames.map(() => '?').join(',')})`;
             params.push(...sucursalNames);
         }
     }
-    
+
     if (users && users.length > 0) {
-        const userNamesResult: any[] = await query(`SELECT fullName FROM users WHERE id IN (${users.map(()=>'?').join(',')})`, [...users]);
+        const userNamesResult: any[] = await query(`SELECT fullName FROM users WHERE id IN (${users.map(() => '?').join(',')})`, [...users]);
         if (userNamesResult.length > 0) {
             const userNames = userNamesResult.map(u => u.fullName);
-            creditsSql += ` AND c.collectionsManager IN (${userNames.map(()=>'?').join(',')})`;
+            creditsSql += ` AND c.collectionsManager IN (${userNames.map(() => '?').join(',')})`;
             params.push(...userNames);
         }
     }
-    
+
     const activeCredits: any[] = await query(creditsSql, params);
-    
+
     const overdueItems: OverdueCreditItem[] = [];
 
     for (const credit of activeCredits) {
@@ -512,7 +528,7 @@ export async function generateOverdueCreditsReport(filters: ReportFilters): Prom
         let type: 'D' | 'M' | 'V' | null = null;
         let installmentAmountForReport = 0;
         let overdueAmountForReport = 0;
-        
+
         // Corrected classification logic
         if (statusDetails.isExpired) {
             type = 'V';
@@ -554,7 +570,6 @@ export async function generateOverdueCreditsReport(filters: ReportFilters): Prom
 }
 export async function generateExpiredCreditsReport(filters: ReportFilters): Promise<ExpiredCreditItem[]> {
     const { dateFrom, dateTo, sucursales, users } = filters;
-    const timeZone = 'America/Managua';
 
     let sql = `
         SELECT 
@@ -583,25 +598,25 @@ export async function generateExpiredCreditsReport(filters: ReportFilters): Prom
     }
 
     if (sucursales && sucursales.length > 0) {
-        const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursales.map(()=>'?').join(',')})`, [...sucursales]);
+        const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursales.map(() => '?').join(',')})`, [...sucursales]);
         if (sucursalNamesResult.length > 0) {
-            const sucursalNames = sucursalNamesResult.map(s => s.name);
-            sql += ` AND c.branchName IN (${sucursalNames.map(()=>'?').join(',')})`;
+            const sucursalNames = sucursalNamesResult.map((s: { name: string }) => s.name);
+            sql += ` AND c.branchName IN (${sucursalNames.map(() => '?').join(',')})`;
             params.push(...sucursalNames);
         }
     }
-    
+
     if (users && users.length > 0) {
-        const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${users.map(()=>'?').join(',')})`, [...users]);
+        const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${users.map(() => '?').join(',')})`, [...users]);
         if (userNamesResult.length > 0) {
-            const userNames = userNamesResult.map(u => u.fullName);
-            sql += ` AND c.collectionsManager IN (${userNames.map(()=>'?').join(',')})`;
+            const userNames = userNamesResult.map((u: { fullName: string }) => u.fullName);
+            sql += ` AND c.collectionsManager IN (${userNames.map(() => '?').join(',')})`;
             params.push(...userNames);
         }
     }
 
     const credits: any[] = await query(sql, params);
-    
+
     const detailedResults: ExpiredCreditItem[] = [];
 
     for (const credit of credits) {
@@ -636,15 +651,15 @@ export async function generateConsolidatedStatement(clientId: string): Promise<C
     }
     const client: Client = clientResult[0];
 
-    const credits: CreditDetail[] = await query('SELECT * FROM credits WHERE clientId = ?', [clientId]);
+    const credits: CreditDetail[] = await query('SELECT id, clientId, amount, status, deliveryDate, firstPaymentDate FROM credits WHERE clientId = ? LIMIT 50', [clientId]);
 
     const creditCount = credits.length;
     const totalCreditAmount = credits.reduce((sum, credit) => sum + credit.amount, 0);
     const averageCreditAmount = creditCount > 0 ? totalCreditAmount / creditCount : 0;
 
     // This is a simplified calculation for demonstration. A real implementation would be more complex.
-    const globalAverageLateDays = 0; 
-    
+    const globalAverageLateDays = 0;
+
     const comercianteInfo: any[] = await query('SELECT economicActivity FROM comerciante_info WHERE clientId = ?', [clientId]);
     const economicActivity = comercianteInfo.length > 0 ? comercianteInfo[0].economicActivity : 'No especificada';
 
@@ -672,8 +687,7 @@ export async function generateConsolidatedStatement(clientId: string): Promise<C
 }
 
 export async function generateDisbursementsReport(filters: ReportFilters): Promise<DisbursementItem[]> {
-  const timeZone = 'America/Managua';
-  let sql = `
+    let sql = `
         SELECT 
             c.id as creditId,
             c.creditNumber,
@@ -686,47 +700,47 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
         FROM credits c
         WHERE c.status IN ('Active', 'Paid', 'Expired', 'Fallecido') AND c.disbursedAmount > 0
     `;
-  const params: any[] = [];
+    const params: any[] = [];
 
-  if (filters.dateFrom) {
-    sql += ' AND c.deliveryDate >= ?';
-    params.push(fromZonedTime(startOfDay(parseISO(filters.dateFrom)), timeZone));
-  }
-  if (filters.dateTo) {
-    sql += ' AND c.deliveryDate <= ?';
-    params.push(fromZonedTime(endOfDay(parseISO(filters.dateTo)), timeZone));
-  }
-
-  if (filters.sucursales && filters.sucursales.length > 0) {
-    const placeholders = filters.sucursales.map(() => '?').join(',');
-    const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${placeholders})`, filters.sucursales);
-    if (Array.isArray(sucursalNamesResult) && sucursalNamesResult.length > 0) {
-      const sucursalNames = sucursalNamesResult.map(s => s.name);
-      const namePlaceholders = sucursalNames.map(() => '?').join(',');
-      sql += ` AND c.branchName IN (${namePlaceholders})`;
-      params.push(...sucursalNames);
+    if (filters.dateFrom) {
+        sql += ' AND c.deliveryDate >= ?';
+        params.push(getReportDateStart(filters.dateFrom));
     }
-  }
-
-  if (filters.users && filters.users.length > 0) {
-    const placeholders = filters.users.map(() => '?').join(',');
-    const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${placeholders})`, filters.users);
-    if (Array.isArray(userNamesResult) && userNamesResult.length > 0) {
-      const userNames = userNamesResult.map(u => u.fullName);
-      const namePlaceholders = userNames.map(() => '?').join(',');
-      sql += ` AND c.disbursedBy IN (${namePlaceholders})`;
-      params.push(...userNames);
+    if (filters.dateTo) {
+        sql += ' AND c.deliveryDate <= ?';
+        params.push(getReportDateEnd(filters.dateTo));
     }
-  }
 
-  sql += ' ORDER BY c.deliveryDate DESC';
+    if (filters.sucursales && filters.sucursales.length > 0) {
+        const placeholders = filters.sucursales.map(() => '?').join(',');
+        const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${placeholders})`, filters.sucursales);
+        if (Array.isArray(sucursalNamesResult) && sucursalNamesResult.length > 0) {
+            const sucursalNames = sucursalNamesResult.map(s => s.name);
+            const namePlaceholders = sucursalNames.map(() => '?').join(',');
+            sql += ` AND c.branchName IN (${namePlaceholders})`;
+            params.push(...sucursalNames);
+        }
+    }
 
-  const results = await query(sql, params);
+    if (filters.users && filters.users.length > 0) {
+        const placeholders = filters.users.map(() => '?').join(',');
+        const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${placeholders})`, filters.users);
+        if (Array.isArray(userNamesResult) && userNamesResult.length > 0) {
+            const userNames = userNamesResult.map(u => u.fullName);
+            const namePlaceholders = userNames.map(() => '?').join(',');
+            sql += ` AND c.disbursedBy IN (${namePlaceholders})`;
+            params.push(...userNames);
+        }
+    }
 
-  return results.map((row: any) => ({
-    ...row,
-    deliveryDate: row.deliveryDate ? new Date(row.deliveryDate).toISOString() : null,
-  })) as DisbursementItem[];
+    sql += ' ORDER BY c.deliveryDate DESC';
+
+    const results = await query(sql, params);
+
+    return results.map((row: any) => ({
+        ...row,
+        deliveryDate: row.deliveryDate ? new Date(row.deliveryDate).toISOString() : null,
+    })) as DisbursementItem[];
 }
 
 export async function generatePaymentsDetailReport(filters: ReportFilters): Promise<PaymentDetailReportData> {
@@ -754,39 +768,58 @@ export async function generatePaymentsDetailReport(filters: ReportFilters): Prom
 
     if (dateFrom) { sql += ` AND pr.paymentDate >= ?`; params.push(`${dateFrom} 00:00:00`); }
     if (dateTo) { sql += ` AND pr.paymentDate <= ?`; params.push(`${dateTo} 23:59:59`); }
-    
-    sql += ' ORDER BY pr.paymentDate DESC';
+
+    sql += ' ORDER BY pr.paymentDate DESC LIMIT 1000'; // Limitar a 1000 registros para evitar sobrecarga
 
     let payments = await query(sql, params) as any[];
 
     if (sucursales && sucursales.length > 0) {
-        const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursales.map(()=>'?').join(',')})`, [...sucursales]);
-        if(sucursalNamesResult.length > 0){
-            const names = sucursalNamesResult.map((s: any) => s.name);
+        const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursales.map(() => '?').join(',')})`, [...sucursales]);
+        if (sucursalNamesResult.length > 0) {
+            const names = sucursalNamesResult.map((s: { name: string }) => s.name);
             payments = payments.filter(p => names.includes(p.sucursal_name));
         }
     }
 
     if (users && users.length > 0) {
-        const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${users.map(()=>'?').join(',')})`, [...users]);
-        if(userNamesResult.length > 0) {
-            const names = userNamesResult.map((u: any) => u.fullName);
+        const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${users.map(() => '?').join(',')})`, [...users]);
+        if (userNamesResult.length > 0) {
+            const names = userNamesResult.map((u: { fullName: string }) => u.fullName);
             payments = payments.filter(p => names.includes(p.gestorName));
         }
     }
-    
-    // Stats calculation
+
+    // Stats calculation - Optimizado para evitar múltiples consultas
     let totalPaid = 0, dueTodayCapital = 0, dueTodayInterest = 0, overdue = 0, expired = 0, advance = 0;
     const clientsPaid = new Set<string>();
 
-    for(const p of payments) {
+    // Obtener todos los créditos únicos de una sola vez
+    const uniqueCreditIds = [...new Set(payments.map(p => p.creditId))];
+    const creditsMap = new Map<string, any>();
+
+    // Limitar el número de créditos procesados para evitar sobrecarga
+    const limitedCreditIds = uniqueCreditIds.slice(0, 100);
+
+    for (const creditId of limitedCreditIds) {
+        try {
+            const credit = await getCredit(creditId);
+            if (credit) {
+                creditsMap.set(creditId, credit);
+            }
+        } catch (error) {
+            console.error(`Error loading credit ${creditId}:`, error);
+            // Continuar con el siguiente crédito en caso de error
+        }
+    }
+
+    for (const p of payments) {
         totalPaid += p.paidAmount;
         clientsPaid.add(p.clientCode);
 
-        const credit = await getCredit(p.creditId);
+        const credit = creditsMap.get(p.creditId);
         if (!credit) continue;
-        
-        const paymentsBeforeThis = (credit.registeredPayments || []).filter(rp => new Date(rp.paymentDate) < new Date(p.paymentDate));
+
+        const paymentsBeforeThis = (credit.registeredPayments || []).filter((rp: { paymentDate: string }) => new Date(rp.paymentDate) < new Date(p.paymentDate));
         const creditStateBefore = { ...credit, registeredPayments: paymentsBeforeThis };
         const statusBefore = calculateCreditStatusDetails(creditStateBefore, p.paymentDate);
 
@@ -848,7 +881,7 @@ export async function generateRecoveryReport(filters: ReportFilters): Promise<Re
     const { sucursales, users, dateFrom, dateTo } = filters;
     let userFilterSql = '';
     const userParams: any[] = [];
-    
+
     if (users && users.length > 0) {
         userFilterSql = `AND u.id IN (${users.map(() => '?').join(',')})`;
         userParams.push(...users);
@@ -858,7 +891,7 @@ export async function generateRecoveryReport(filters: ReportFilters): Promise<Re
     }
 
     const userRows: any[] = await query(`SELECT id, fullName FROM users u WHERE u.active = true ${userFilterSql}`, userParams);
-    
+
     const report: RecoveryReportItem[] = [];
 
     for (const user of userRows) {
@@ -890,7 +923,7 @@ export async function generateRecoveryReport(filters: ReportFilters): Promise<Re
         const creditCount = creditCountResult[0]?.total || 0;
 
         if (creditCount > 0 || collectedAmount > 0) {
-             report.push({
+            report.push({
                 gestorName: user.fullName,
                 creditCount,
                 expectedAmount,
@@ -932,19 +965,19 @@ export async function generateFutureInstallmentsReport(filters: ReportFilters): 
     }
 
     if (sucursales && sucursales.length > 0) {
-        const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursales.map(()=>'?').join(',')})`, [...sucursales]);
+        const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursales.map(() => '?').join(',')})`, [...sucursales]);
         if (Array.isArray(sucursalNamesResult) && sucursalNamesResult.length > 0) {
             const sucursalNames = sucursalNamesResult.map(s => s.name);
-            sql += ` AND c.branchName IN (${sucursalNames.map(()=>'?').join(',')})`;
+            sql += ` AND c.branchName IN (${sucursalNames.map(() => '?').join(',')})`;
             params.push(...sucursalNames);
         }
     }
-    
+
     if (users && users.length > 0) {
-        const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${users.map(()=>'?').join(',')})`, [...users]);
+        const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${users.map(() => '?').join(',')})`, [...users]);
         if (Array.isArray(userNamesResult) && userNamesResult.length > 0) {
             const userNames = userNamesResult.map(u => u.fullName);
-            sql += ` AND c.collectionsManager IN (${userNames.map(()=>'?').join(',')})`;
+            sql += ` AND c.collectionsManager IN (${userNames.map(() => '?').join(',')})`;
             params.push(...userNames);
         }
     }
@@ -992,7 +1025,6 @@ export async function generateFutureInstallmentsReport(filters: ReportFilters): 
 
 export async function generateRejectionAnalysisReport(filters: ReportFilters): Promise<RejectionAnalysisItem[]> {
     const { sucursales, users, dateFrom, dateTo } = filters;
-    const timeZone = 'America/Managua';
 
     let sql = `
         SELECT 
@@ -1010,11 +1042,11 @@ export async function generateRejectionAnalysisReport(filters: ReportFilters): P
 
     if (dateFrom) {
         sql += ` AND c.applicationDate >= ?`;
-        params.push(fromZonedTime(startOfDay(parseISO(dateFrom)), timeZone));
+        params.push(getReportDateStart(dateFrom));
     }
     if (dateTo) {
         sql += ` AND c.applicationDate <= ?`;
-        params.push(fromZonedTime(endOfDay(parseISO(dateTo)), timeZone));
+        params.push(getReportDateEnd(dateTo));
     }
 
     if (sucursales && sucursales.length > 0) {
@@ -1052,7 +1084,7 @@ export async function generateRejectionAnalysisReport(filters: ReportFilters): P
 
 // --- Excel export functions ---
 
-const createExcelFile = (data: any[], sheetName: string, columns?: {wch: number}[]) => {
+const createExcelFile = (data: any[], sheetName: string, columns?: { wch: number }[]) => {
     const worksheet = XLSX.utils.json_to_sheet(data);
     if (columns) {
         worksheet['!cols'] = columns;

@@ -18,6 +18,7 @@ import { useUser } from '@/hooks/use-user';
 import { AccessDenied } from '@/components/AccessDenied';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { todayInNicaragua } from '@/lib/date-utils';
 import { CalculatorIcon, DollarSign, Percent, Calendar, Hash } from 'lucide-react';
 
 const ALLOWED_ROLES: UserRole[] = ['ADMINISTRADOR', 'GERENTE', 'SUPERVISOR', 'GESTOR', 'OPERATIVO'];
@@ -54,7 +55,7 @@ export default function CalculatorPage() {
       monthlyInterestRate: data.interestRate,
       termMonths: data.termMonths,
       paymentFrequency: data.paymentFrequency,
-      startDate: new Date().toISOString().split('T')[0], // Usar solo la parte de la fecha
+      startDate: todayInNicaragua(), // Usar fecha actual de Nicaragua
       holidays: [], // No se necesitan feriados para una simulación simple
     });
     setPaymentPlan(result);

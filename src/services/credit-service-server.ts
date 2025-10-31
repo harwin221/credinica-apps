@@ -66,8 +66,8 @@ export async function addCredit(creditData: Partial<CreditApplication> & { deliv
             approvalDate ? isoToMySQLDateTime(approvalDate) : null,
             approvedBy, amount, amount, interestRate, termMonths, paymentFrequency, 'CÓRDOBAS',
             scheduleData.totalPayment, scheduleData.totalInterest, scheduleData.periodicPayment,
-            isoToMySQLDate(firstPaymentDate),
-            deliveryDate ? isoToMySQLDate(deliveryDate) : null,
+            isoToMySQLDateTime(firstPaymentDate),
+            deliveryDate ? isoToMySQLDateTime(deliveryDate) : null,
             scheduleData.schedule[scheduleData.schedule.length - 1].paymentDate,
             gestor.fullName, supervisorUser?.fullName || null, creator.fullName,
             gestor.sucursal || null, gestor.sucursalName || null, productType, subProduct, productDestination
@@ -91,7 +91,7 @@ export async function addCredit(creditData: Partial<CreditApplication> & { deliv
 
         if (scheduleData.schedule.length > 0) {
             for (const p of scheduleData.schedule) {
-                await query('INSERT INTO payment_plan (creditId, paymentNumber, paymentDate, amount, principal, interest, balance) VALUES (?, ?, ?, ?, ?, ?, ?)', [newCreditId, p.paymentNumber, p.paymentDate, p.amount, p.principal, p.interest, p.balance]);
+                await query('INSERT INTO payment_plan (creditId, paymentNumber, paymentDate, amount, principal, interest, balance) VALUES (?, ?, ?, ?, ?, ?, ?)', [newCreditId, p.paymentNumber, `${p.paymentDate} 00:00:00`, p.amount, p.principal, p.interest, p.balance]);
             }
         }
 
@@ -148,7 +148,10 @@ export async function updateCredit(id: string, creditData: Partial<CreditDetail>
 
             // Convertir fechas a formato MySQL si existen
             if (filteredFields.deliveryDate && typeof filteredFields.deliveryDate === 'string') {
-                filteredFields.deliveryDate = isoToMySQLDate(filteredFields.deliveryDate);
+                filteredFields.deliveryDate = isoToMySQLDateTime(filteredFields.deliveryDate);
+            }
+            if (filteredFields.firstPaymentDate && typeof filteredFields.firstPaymentDate === 'string') {
+                filteredFields.firstPaymentDate = isoToMySQLDateTime(filteredFields.firstPaymentDate);
             }
             if (filteredFields.approvalDate && typeof filteredFields.approvalDate === 'string') {
                 filteredFields.approvalDate = isoToMySQLDateTime(filteredFields.approvalDate);
@@ -474,7 +477,7 @@ export async function revalidateActiveCreditsStatus(): Promise<{ success: boolea
                 // Borrar y volver a insertar el plan de pagos
                 await query('DELETE FROM payment_plan WHERE creditId = ?', [credit.id]);
                 for (const p of scheduleData.schedule) {
-                    await query('INSERT INTO payment_plan (creditId, paymentNumber, paymentDate, amount, principal, interest, balance) VALUES (?, ?, ?, ?, ?, ?, ?)', [credit.id, p.paymentNumber, p.paymentDate, p.amount, p.principal, p.interest, p.balance]);
+                    await query('INSERT INTO payment_plan (creditId, paymentNumber, paymentDate, amount, principal, interest, balance) VALUES (?, ?, ?, ?, ?, ?, ?)', [credit.id, p.paymentNumber, `${p.paymentDate} 00:00:00`, p.amount, p.principal, p.interest, p.balance]);
                 }
                 updatedCount++;
             }

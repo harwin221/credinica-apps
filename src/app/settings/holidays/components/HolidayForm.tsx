@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
+import { DateInput } from '@/components/ui/date-input';
 
 const holidayFormSchema = z.object({
   name: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres.' }),
@@ -107,10 +108,12 @@ export function HolidayForm({ isOpen, onClose, onSuccess }: HolidayFormProps) {
                 <FormItem>
                   <FormLabel>Fecha</FormLabel>
                   <FormControl>
-                     <div className="relative">
-                      <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input type="date" {...field} className="pl-8" />
-                    </div>
+                    <DateInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Seleccionar fecha"
+                      required
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

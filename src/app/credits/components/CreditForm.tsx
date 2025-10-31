@@ -556,19 +556,11 @@ export function CreditForm({ initialData }: CreditFormProps) {
                       <FormItem>
                         <FormLabel>Fecha de Primera Cuota</FormLabel>
                         <FormControl>
-                          <Input
-                            type="date"
-                            value={field.value ? formatDateForUser(field.value, 'yyyy-MM-dd') : ''}
-                            onChange={(e) => {
-                              const dateValue = e.target.value;
-                              if (dateValue) {
-                                const isoValue = userInputToISO(dateValue);
-                                field.onChange(isoValue);
-                              } else {
-                                field.onChange('');
-                              }
-                            }}
+                          <DateInput
+                            value={field.value}
+                            onChange={field.onChange}
                             placeholder="Seleccionar fecha"
+                            required
                           />
                         </FormControl>
                         <FormMessage />

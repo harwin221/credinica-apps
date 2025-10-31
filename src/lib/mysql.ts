@@ -4,16 +4,17 @@
 import 'server-only';
 import mysql from 'mysql2/promise';
 import { unstable_noStore as noStore } from 'next/cache';
+import { queryLimiter } from './rate-limiter';
 
 // --- IMPLEMENTACIÓN DE SINGLETON PARA EL POOL DE CONEXIONES ---
 
 // 1. Definir una interfaz para la variable global
-interface GlobalWithPool extends NodeJS.Global {
+interface GlobalWithPool {
   mysqlPool?: mysql.Pool;
 }
 
 // 2. Usar un alias para el objeto global para asegurar el tipado
-const globalWithPool = global as GlobalWithPool;
+const globalWithPool = globalThis as typeof globalThis & GlobalWithPool;
 
 let pool: mysql.Pool;
 
@@ -26,8 +27,10 @@ if (process.env.NODE_ENV === 'production') {
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 5,
     queueLimit: 0,
+    maxIdle: 3,
+    idleTimeout: 60000,
     decimalNumbers: true,
     ssl: process.env.MYSQL_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   });
@@ -41,8 +44,10 @@ if (process.env.NODE_ENV === 'production') {
       password: process.env.MYSQL_PASSWORD,
       database: process.env.MYSQL_DATABASE,
       waitForConnections: true,
-      connectionLimit: 10,
+      connectionLimit: 5,
       queueLimit: 0,
+      maxIdle: 3,
+      idleTimeout: 60000,
       decimalNumbers: true,
       ssl: process.env.MYSQL_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
     });
@@ -58,19 +63,54 @@ if (process.env.NODE_ENV === 'production') {
  */
 export async function query(sql: string, params: any[] = []): Promise<any[]> {
   noStore(); // Previene el cacheo de los resultados de la consulta
-  try {
-    // pool.execute() maneja automáticamente la adquisición y liberación de la conexión.
-    const [rows] = await pool.execute(sql, params);
-    return rows as any[];
-  } catch (error) {
-    console.error('Error en la consulta a MySQL:', error);
-    // En desarrollo, lanza el error real para debugging; en producción, usa el genérico
-    if (process.env.APP_DEBUG === 'true') {
-      throw error;
-    } else {
-      throw new Error('Ocurrió un error al procesar la solicitud a la base de datos.');
+  
+  return queryLimiter.execute(async () => {
+    const startTime = Date.now();
+    let connection: mysql.PoolConnection | null = null;
+    
+    try {
+      // Obtener conexión del pool con timeout
+      connection = await pool.getConnection();
+      const [rows] = await connection.execute(sql, params);
+      
+      const duration = Date.now() - startTime;
+      if (duration > 5000) { // Log consultas lentas (>5s)
+        console.warn(`Consulta lenta detectada (${duration}ms):`, sql.substring(0, 100));
+      }
+      
+      return rows as any[];
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      const limiterStats = queryLimiter.getStats();
+      
+      console.error('Error en la consulta a MySQL:', {
+        error: error.message,
+        code: error.code,
+        errno: error.errno,
+        sql: sql.substring(0, 100),
+        duration: `${duration}ms`,
+        poolStats: 'Connection pool info not available',
+        rateLimiter: limiterStats
+      });
+      
+      // Manejar errores específicos de conexión
+      if (error.code === 'ER_CON_COUNT_ERROR' || error.code === 'ECONNREFUSED') {
+        throw new Error('El servidor de base de datos está sobrecargado. Intente nuevamente en unos momentos.');
+      }
+      
+      // En desarrollo, lanza el error real para debugging; en producción, usa el genérico
+      if (process.env.APP_DEBUG === 'true') {
+        throw error;
+      } else {
+        throw new Error('Ocurrió un error al procesar la solicitud a la base de datos.');
+      }
+    } finally {
+      // Asegurar que la conexión se libere
+      if (connection) {
+        connection.release();
+      }
     }
-  }
+  });
 }
 
 

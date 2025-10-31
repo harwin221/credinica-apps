@@ -18,6 +18,7 @@ import { useUser } from '@/hooks/use-user';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toZonedTime } from 'date-fns-tz';
 import { todayInNicaragua, formatDateForUser, userInputToISO } from '@/lib/date-utils';
+import { DateInput } from '@/components/ui/date-input';
 
 
 const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -122,10 +123,12 @@ export function DisbursementForm({ isOpen, onClose, onSubmit, credit }: Disburse
                     <FormLabel>Fecha de Primera Cuota (Final)</FormLabel>
                   </div>
                    <FormControl>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input type="date" {...field} className="pl-8" />
-                    </div>
+                    <DateInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Seleccionar fecha"
+                      required
+                    />
                   </FormControl>
                   <FormDescription className="text-xs">Fecha original propuesta: {originalDate}</FormDescription>
                   <FormMessage />

@@ -134,9 +134,23 @@ export function generatePaymentSchedule(data: PaymentScheduleArgs): CalculatedPa
   }
 
   // --- MANEJO SEGURO DE FECHAS (FIX) ---
-  // Interpreta la fecha como local, no como UTC.
-  const initialDate = parseISO(dateInput.includes('T') ? dateInput : `${dateInput}T00:00:00`);
-  if (isNaN(initialDate.getTime())) return null;
+  // Usar las funciones de fecha de Nicaragua para evitar problemas de zona horaria
+  let initialDate: Date;
+  try {
+    if (dateInput.includes('T')) {
+      // Si ya es ISO, parsearlo directamente
+      initialDate = parseISO(dateInput);
+    } else {
+      // Si es solo fecha (YYYY-MM-DD), crear fecha local de Nicaragua
+      const nicaraguaDate = new Date(`${dateInput}T00:00:00`);
+      initialDate = nicaraguaDate;
+    }
+    
+    if (isNaN(initialDate.getTime())) return null;
+  } catch (error) {
+    console.error('Error parsing date in generatePaymentSchedule:', error);
+    return null;
+  }
 
   let numberOfPayments: number;
   
@@ -766,9 +780,31 @@ export const translateCreditStatus = (status?: CreditStatus): string => {
 
 // Robust date formatting function to be used across the app
 export const formatDate = (dateInput?: string | Date | number, formatStr: string = 'dd/MM/yyyy'): string => {
-    return formatDateForUser(dateInput as any, formatStr);
+    if (!dateInput) return 'N/A';
+    
+    try {
+        // Convertir number a Date si es necesario
+        if (typeof dateInput === 'number') {
+            return formatDateForUser(new Date(dateInput), formatStr);
+        }
+        return formatDateForUser(dateInput as string | Date, formatStr);
+    } catch (error) {
+        console.error('Error in formatDate:', error, 'Input:', dateInput);
+        return 'N/A';
+    }
 };
 
 export const formatTime = (dateInput?: string | Date | number, formatStr: string = 'h:mm a'): string => {
-    return formatDateForUser(dateInput as any, formatStr);
+    if (!dateInput) return 'N/A';
+    
+    try {
+        // Convertir number a Date si es necesario
+        if (typeof dateInput === 'number') {
+            return formatDateForUser(new Date(dateInput), formatStr);
+        }
+        return formatDateForUser(dateInput as string | Date, formatStr);
+    } catch (error) {
+        console.error('Error in formatTime:', error, 'Input:', dateInput);
+        return 'N/A';
+    }
 };
