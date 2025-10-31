@@ -27,18 +27,18 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: APP_NAME,
-    startupImage: "/CrediNica inicial.png",
+    startupImage: "/CrediNica-inicial.png",
   },
   formatDetection: {
     telephone: false,
   },
   icons: {
     icon: [
-      { url: "/CrediNica inicial.png", sizes: "192x192", type: "image/png" },
+      { url: "/CrediNica-inicial.png", sizes: "192x192", type: "image/png" },
       { url: "/CrediNica.png", sizes: "512x512", type: "image/png" }
     ],
     apple: [
-      { url: "/CrediNica inicial.png", sizes: "180x180", type: "image/png" }
+      { url: "/CrediNica-inicial.png", sizes: "180x180", type: "image/png" }
     ]
   },
   keywords: ["créditos", "cobranza", "microfinanzas", "nicaragua", "gestión financiera"],
@@ -68,15 +68,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
-       <head>
-        <link rel="apple-touch-icon" sizes="180x180" href="/CrediNica inicial.png" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="CrediNica" />
-        <meta name="msapplication-TileColor" content="#1f2937" />
-        <meta name="msapplication-TileImage" content="/CrediNica inicial.png" />
-       </head>
       <body className={cn("font-sans antialiased", fontInter.variable)}>
         {/* AppClientLayout ahora envuelve UserProvider internamente */}
         <AppClientLayout>{children}</AppClientLayout>

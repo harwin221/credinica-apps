@@ -4,7 +4,7 @@
   "description": "Sistema completo de gestión de créditos y cobranza para microfinancieras",
   "icons": [
     {
-      "src": "/CrediNica inicial.png",
+      "src": "/CrediNica-inicial.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
