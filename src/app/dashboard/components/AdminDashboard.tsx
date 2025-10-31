@@ -9,6 +9,7 @@ import { generateColocacionVsRecuperacionReport, type ColocacionRecuperacionItem
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { nowInNicaragua } from '@/lib/date-utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -166,7 +167,7 @@ export function GlobalDashboard({ user, initialSucursales, initialReportData }: 
         if (!selectedCreditForPayment || !user) return;
         
         const newPayment: Omit<RegisteredPayment, 'id' | 'status'> = {
-            paymentDate: new Date().toISOString(),
+            paymentDate: nowInNicaragua(),
             amount: paymentValues.amount,
             managedBy: user.fullName,
             transactionNumber: `PAY-${Date.now()}`

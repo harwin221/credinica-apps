@@ -3,8 +3,9 @@
 
 import * as React from 'react';
 import { useUser } from '@/hooks/use-user';
-import { updateCredit } from '@/services/credit-service-server'; 
-import type { CreditDetail, User, UserRole } from '@/lib/types';
+import { updateCredit } from '@/app/credits/actions';
+import { nowInNicaragua } from '@/lib/date-utils'; 
+import type { CreditDetail, AppUser as User, UserRole } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -72,7 +73,7 @@ function CreditApprovalTabs({ user }: { user: User}) {
     try {
         await updateCredit(creditId, { 
             status: 'Approved',
-            approvalDate: new Date().toISOString(),
+            approvalDate: nowInNicaragua(),
             approvedBy: user.fullName
         }, user);
         toast({ title: 'Solicitud Aprobada', description: 'El estado del crédito ha sido actualizado.', variant: 'info' });
@@ -89,7 +90,7 @@ function CreditApprovalTabs({ user }: { user: User}) {
     try {
         await updateCredit(creditId, { 
             status: 'Rejected', 
-            approvalDate: new Date().toISOString(),
+            approvalDate: nowInNicaragua(),
             rejectionReason: reason,
             rejectedBy: user.fullName
         }, user);

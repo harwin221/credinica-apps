@@ -28,6 +28,8 @@ import { Loader2, TrendingUp, Wallet, Calendar } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { useUser } from '@/hooks/use-user';
+import { DateInput } from '@/components/ui/date-input';
+import { nowInNicaragua } from '@/lib/date-utils';
 
 export type PaymentFormValues = z.infer<ReturnType<typeof createPaymentFormSchema>>;
 
@@ -48,7 +50,7 @@ const createPaymentFormSchema = (maxAmount: number) => z.object({
     .number()
     .positive({ message: 'El monto debe ser positivo.' })
     .max(maxAmount, { message: `El pago no puede exceder el saldo de C$${maxAmount.toFixed(2)}` }),
-  paymentDate: z.string().refine((date) => !isNaN(new Date(date).getTime()), { message: "Formato de fecha inválido."}),
+  paymentDate: z.string().min(1, { message: "Debe seleccionar una fecha válida."}),
 });
 
 
@@ -66,14 +68,14 @@ export function DesktopPaymentForm({ isOpen, onClose, onSubmit, creditBalance, d
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
-    defaultValues: { amount: undefined, paymentDate: format(new Date(), 'yyyy-MM-dd') },
+    defaultValues: { amount: undefined, paymentDate: nowInNicaragua() },
   });
 
   React.useEffect(() => {
     if (isOpen) {
       form.reset({
         amount: undefined,
-        paymentDate: format(new Date(), 'yyyy-MM-dd'),
+        paymentDate: nowInNicaragua(),
       });
     }
   }, [isOpen, form]);
@@ -140,10 +142,12 @@ export function DesktopPaymentForm({ isOpen, onClose, onSubmit, creditBalance, d
                     <FormItem>
                     <FormLabel>Fecha del Pago</FormLabel>
                     <FormControl>
-                        <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input type="date" {...field} className="pl-8" />
-                        </div>
+                        <DateInput
+                            value={field.value}
+                            onChange={(isoValue) => field.onChange(isoValue)}
+                            placeholder="Seleccionar fecha del pago"
+                            required
+                        />
                     </FormControl>
                     <FormMessage />
                     </FormItem>

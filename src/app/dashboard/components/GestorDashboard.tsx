@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, parseISO, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { nowInNicaragua } from '@/lib/date-utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PaymentForm } from '@/app/credits/components/PaymentForm';
@@ -128,7 +129,7 @@ export function GestorDashboard({ user, initialPortfolio, initialSummary }: { us
     if (!selectedCreditForPayment || !user) return;
     
     const newPayment: Omit<RegisteredPayment, 'id' | 'status'> = {
-        paymentDate: new Date().toISOString(),
+        paymentDate: nowInNicaragua(),
         amount: paymentValues.amount,
         managedBy: user.fullName,
         transactionNumber: `PAY-${Date.now()}`,

@@ -14,10 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { es } from 'date-fns/locale';
+import { formatDateForUser } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
 import { DollarSign, Printer, Undo2, MoreHorizontal, Trash2, FileSignature, Loader2, ShieldAlert, HeartOff, CheckCircle } from 'lucide-react';
-import { PaymentForm, PaymentFormValues } from './PaymentForm';
-import { DesktopPaymentForm } from './DesktopPaymentForm';
+import { PaymentForm, PaymentFormValues } from '../../components/PaymentForm';
+import { DesktopPaymentForm } from '../../components/DesktopPaymentForm';
 import { calculateCreditStatusDetails, translateCreditStatus, getRiskCategoryVariant, formatDate } from '@/lib/utils';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
@@ -61,8 +62,8 @@ const SectionTitle = ({ title }: { title: string }) => (
 );
 
 interface CreditDetailViewProps {
-  credit: CreditDetail;
-  onPaymentSuccess?: () => void;
+    credit: CreditDetail;
+    onPaymentSuccess?: () => void;
 }
 
 const FIELD_ROLES: UserRole[] = ['GESTOR', 'SUPERVISOR'];
@@ -85,17 +86,17 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
     React.useEffect(() => {
         setDeviceType(getDeviceType());
     }, []);
-    
+
     React.useEffect(() => {
         setCredit(initialCredit);
     }, [initialCredit]);
-    
+
     const { remainingBalance, overdueAmount, lateDays, currentLateFee, paidToday, dueTodayAmount, conamiCategory } = calculateCreditStatusDetails(credit);
     const riskVariant = getRiskCategoryVariant(conamiCategory);
-    
+
     const handleOpenPaymentModal = () => {
-        if(credit.status !== 'Active') {
-            toast({ title: 'Crédito no activo', description: 'No se pueden registrar pagos a un crédito que no está activo.', variant: 'destructive'});
+        if (credit.status !== 'Active') {
+            toast({ title: 'Crédito no activo', description: 'No se pueden registrar pagos a un crédito que no está activo.', variant: 'destructive' });
             return;
         }
         setIsPaymentModalOpen(true);
@@ -118,13 +119,13 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
             router.refresh();
             onPaymentSuccess?.();
         } catch (error) {
-             const errorMessage = error instanceof Error ? error.message : 'No se pudo revertir el desembolso.';
+            const errorMessage = error instanceof Error ? error.message : 'No se pudo revertir el desembolso.';
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         } finally {
             setIsLoading(false);
         }
     };
-    
+
     const handleOpenVoidModal = (payment: RegisteredPayment) => {
         if (payment.status === 'ANULADO') {
             toast({ title: "Pago ya anulado", description: "Este pago ya ha sido marcado como anulado.", variant: 'destructive' });
@@ -134,11 +135,11 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
         setVoidReason('');
         setIsVoidModalOpen(true);
     }
-    
+
     const handleVoidAction = async () => {
         if (!paymentToVoid || !user) return;
         setIsLoading(true);
-        
+
         try {
             if (user.role === 'GESTOR') {
                 await requestVoidPayment(credit.id, paymentToVoid.id, voidReason, user);
@@ -150,11 +151,11 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                     toast({ title: 'Anulación Aprobada', description: 'El pago ha sido marcado como anulado.' });
                 } else {
                     // Admin directly voids a valid payment
-                     await voidPayment(credit.id, paymentToVoid.id, user);
-                     toast({ title: 'Pago Anulado Directamente', description: 'El pago ha sido marcado como anulado por el administrador.' });
+                    await voidPayment(credit.id, paymentToVoid.id, user);
+                    toast({ title: 'Pago Anulado Directamente', description: 'El pago ha sido marcado como anulado por el administrador.' });
                 }
             }
-            
+
             onPaymentSuccess?.();
             setIsVoidModalOpen(false);
             setPaymentToVoid(null);
@@ -168,7 +169,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
 
     const handlePaymentSubmit = async (data: PaymentFormValues) => {
         if (!user) {
-            toast({ title: "Error", description: "No se pudo identificar al usuario.", variant: "destructive"});
+            toast({ title: "Error", description: "No se pudo identificar al usuario.", variant: "destructive" });
             return;
         }
         setIsLoading(true);
@@ -182,18 +183,18 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
 
         try {
             const result = await addPayment(credit.id, newPayment, user);
-            if(result.success && result.paymentId) {
+            if (result.success && result.paymentId) {
                 toast({ title: "Pago Registrado", description: `El abono de ${formatCurrency(data.amount)} ha sido registrado.` });
                 setIsPaymentModalOpen(false);
-                
+
                 if (deviceType === 'mobile') {
                     printDocument('receipt', credit.id, result.paymentId, false);
                 }
-                
-                router.refresh(); 
-                onPaymentSuccess?.(); 
+
+                router.refresh();
+                onPaymentSuccess?.();
             } else {
-                 toast({ title: "Error al Registrar Pago", description: result.error || 'Ocurrió un error desconocido.', variant: "destructive"});
+                toast({ title: "Error al Registrar Pago", description: result.error || 'Ocurrió un error desconocido.', variant: "destructive" });
             }
         } catch (e: any) {
             toast({ title: "Error", description: e.message || "No se pudo registrar el pago.", variant: "destructive" });
@@ -227,10 +228,10 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
 
 
     const fullAddress = [
-      credit.clientDetails?.department,
-      credit.clientDetails?.municipality,
-      credit.clientDetails?.neighborhood,
-      credit.clientDetails?.address,
+        credit.clientDetails?.department,
+        credit.clientDetails?.municipality,
+        credit.clientDetails?.neighborhood,
+        credit.clientDetails?.address,
     ].filter(Boolean).join(', ');
 
     const workAddress = credit.clientDetails?.asalariadoInfo?.companyAddress || credit.clientDetails?.comercianteInfo?.businessAddress;
@@ -240,7 +241,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
     const canRequestVoidPayment = user?.role === 'GESTOR';
     const isFieldUser = user && FIELD_ROLES.includes(user.role);
     const isGestor = user?.role === 'GESTOR';
-    
+
     const totalPaid = (credit.registeredPayments || []).filter(p => p.status !== 'ANULADO').reduce((sum, p) => sum + p.amount, 0);
 
     const totalGuaranteesValue = (credit.guarantees || []).reduce((sum, g) => sum + g.estimatedValue, 0);
@@ -248,34 +249,34 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
     return (
         <>
             <div className="flex justify-between items-center mb-4">
-                 <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold">Crédito #: {credit.creditNumber}</h2>
                     <Badge variant={credit.status === 'Active' ? 'default' : 'secondary'}>{translateCreditStatus(credit.status)}</Badge>
                 </div>
                 <div className="flex gap-2">
-                   <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={handleOpenPaymentModal} disabled={credit.status !== 'Active'}>
-                          <DollarSign className="mr-2 h-4 w-4" /> Registrar Abono
-                        </DropdownMenuItem>
-                        {canManageCredit && credit.status === 'Active' && (
-                           <>
-                            <DropdownMenuItem onClick={() => setIsRevertModalOpen(true)} className="text-destructive">
-                                <Undo2 className="mr-2 h-4 w-4" /> Regresar Desembolso
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={handleOpenPaymentModal} disabled={credit.status !== 'Active'}>
+                                <DollarSign className="mr-2 h-4 w-4" /> Registrar Abono
                             </DropdownMenuItem>
-                           </>
-                        )}
-                        {canManageCredit && credit.status !== 'Fallecido' && (
-                           <DropdownMenuItem onClick={() => setIsDeceasedModalOpen(true)} className="text-destructive">
-                                <HeartOff className="mr-2 h-4 w-4" /> Marcar como Fallecido
-                            </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
+                            {canManageCredit && credit.status === 'Active' && (
+                                <>
+                                    <DropdownMenuItem onClick={() => setIsRevertModalOpen(true)} className="text-destructive">
+                                        <Undo2 className="mr-2 h-4 w-4" /> Regresar Desembolso
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            {canManageCredit && credit.status !== 'Fallecido' && (
+                                <DropdownMenuItem onClick={() => setIsDeceasedModalOpen(true)} className="text-destructive">
+                                    <HeartOff className="mr-2 h-4 w-4" /> Marcar como Fallecido
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
             </div>
@@ -290,7 +291,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                         <TabsTrigger value="payments">Historial de Abonos</TabsTrigger>
                     </TabsList>
                 </div>
-                
+
                 <TabsContent value="details">
                     <Card><CardContent className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-4">
@@ -314,7 +315,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                             <div><Label>Monto Principal</Label><p className="font-medium">{formatCurrency(credit.principalAmount)}</p></div>
                             <div><Label>Monto Total del Crédito</Label><p className="font-medium">{formatCurrency(credit.totalAmount)}</p></div>
                             <div><Label>Cuota a Pagar</Label><p className="font-medium">{formatCurrency(credit.totalInstallmentAmount)}</p></div>
-                            <div/>
+                            <div />
                             <div><Label>Fecha de Entrega</Label><p className="font-medium">{formatDate(credit.deliveryDate)}</p></div>
                             <div><Label>Fecha de Primera Cuota</Label><p className="font-medium">{formatDate(credit.firstPaymentDate)}</p></div>
                             <div><Label>Fecha de Vencimiento</Label><p className="font-medium">{formatDate(credit.dueDate)}</p></div>
@@ -322,19 +323,19 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                             <SectionTitle title="Información de Gestión" />
                             <div className="lg:col-span-2"><Label>Gestor de Cobro</Label><p className="font-medium">{credit.collectionsManager}</p></div>
                             <div className="lg:col-span-2"><Label>Supervisor</Label><p className="font-medium">{credit.supervisor}</p></div>
-                            
-                           {!isGestor && (
+
+                            {!isGestor && (
                                 <>
                                     <SectionTitle title="Trazabilidad" />
                                     <div><Label>Creado por</Label><p className="font-medium">{credit.createdBy}</p></div>
                                     <div><Label>Aprobado por</Label><p className="font-medium">{credit.approvedBy}</p></div>
                                     <div><Label>Desembolsado por</Label><p className="font-medium">{credit.disbursedBy}</p></div>
-                                    <div><Label>Última Modificación</Label><p className="font-medium">{credit.lastModifiedBy}</p></div>
+                                    <div><Label>Última Modificación</Label><p className="font-medium">{credit.lastModifiedBy}{credit.updatedAt && ` (${formatDateForUser(credit.updatedAt)})`}</p></div>
                                 </>
                             )}
                         </div>
                     </CardContent></Card>
-                 </TabsContent>
+                </TabsContent>
 
                 <TabsContent value="summary">
                     <Card>
@@ -342,16 +343,18 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                             <CardTitle>Resumen del Estado del Crédito</CardTitle>
                         </CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                             <StatCard title="Saldo Pendiente" value={formatCurrency(remainingBalance)} />
-                             <StatCard title="Monto en Mora" value={formatCurrency(overdueAmount)} className="text-destructive" />
-                             <StatCard title="Días de Atraso" value={lateDays.toString()} className="text-destructive" />
-                             <StatCard title="Clasificación CONAMI" value={conamiCategory || 'N/A'} icon={ShieldAlert} className={riskVariant} />
+                            <StatCard title="Saldo Pendiente" value={formatCurrency(remainingBalance)} />
+                            <StatCard title="Monto en Mora" value={formatCurrency(overdueAmount)} className="text-destructive" />
+                            <StatCard title="Días de Atraso" value={lateDays.toString()} className="text-destructive" />
+                            <StatCard title="Clasificación CONAMI" value={conamiCategory || 'N/A'} icon={ShieldAlert} className={riskVariant} />
                         </CardContent>
-                         <CardFooter className="flex justify-end pt-4">
-                            <Button variant="outline" onClick={() => handlePrintDesktopDocument('promissory-note')}>
-                                <FileSignature className="mr-2 h-4 w-4" /> Imprimir Pagaré
-                            </Button>
-                        </CardFooter>
+                        {!isGestor && (
+                            <CardFooter className="flex justify-end pt-4">
+                                <Button variant="outline" onClick={() => handlePrintDesktopDocument('promissory-note')}>
+                                    <FileSignature className="mr-2 h-4 w-4" /> Imprimir Pagaré
+                                </Button>
+                            </CardFooter>
+                        )}
                     </Card>
                 </TabsContent>
 
@@ -359,7 +362,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                     <Card>
                         <CardHeader><CardTitle>Fiadores Registrados</CardTitle></CardHeader>
                         <CardContent>
-                             <Table>
+                            <Table>
                                 <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Cédula</TableHead><TableHead>Teléfono</TableHead><TableHead>Dirección</TableHead></TableRow></TableHeader>
                                 <TableBody>
                                     {credit.guarantors && Array.isArray(credit.guarantors) && credit.guarantors.length > 0 ? credit.guarantors.map((g) => (
@@ -375,8 +378,8 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                         </CardContent>
                     </Card>
                 </TabsContent>
-                
-                 {!isGestor && (
+
+                {!isGestor && (
                     <TabsContent value="guarantees">
                         <Card>
                             <CardHeader><CardTitle>Garantías Registradas</CardTitle></CardHeader>
@@ -403,15 +406,17 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                             </CardContent>
                         </Card>
                     </TabsContent>
-                 )}
-                
+                )}
+
                 <TabsContent value="paymentPlan">
                     <Card>
                         <CardHeader className="flex flex-row justify-between items-center">
                             <CardTitle>Plan de Pagos</CardTitle>
-                            <Button variant="outline" onClick={() => handlePrintDesktopDocument('payment-plan')}>
-                                <Printer className="mr-2 h-4 w-4" /> Imprimir Plan de Pago
-                            </Button>
+                            {!isGestor && (
+                                <Button variant="outline" onClick={() => handlePrintDesktopDocument('payment-plan')}>
+                                    <Printer className="mr-2 h-4 w-4" /> Imprimir Plan de Pago
+                                </Button>
+                            )}
                         </CardHeader>
                         <CardContent>
                             <Table>
@@ -443,57 +448,57 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                 </TabsContent>
 
                 <TabsContent value="payments">
-                     <Card>
+                    <Card>
                         <CardHeader><CardTitle>Historial de Abonos Registrados</CardTitle></CardHeader>
                         <CardContent>
-                             <Table>
+                            <Table>
                                 <TableHeader><TableRow><TableHead>Fecha y Hora</TableHead><TableHead>Monto</TableHead><TableHead>Gestor</TableHead><TableHead># Transacción</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                 <TableBody>
                                     {Array.isArray(credit.registeredPayments) && credit.registeredPayments.length > 0 ? (
                                         credit.registeredPayments.sort((a, b) => parseISO(b.paymentDate).getTime() - parseISO(a.paymentDate).getTime()).map((p) => (
-                                        <TableRow key={p.id} className={p.status === 'ANULADO' ? 'text-muted-foreground line-through' : ''}>
-                                            <TableCell>{`${formatDate(p.paymentDate)}, ${formatTime(p.paymentDate)}`}</TableCell>
-                                            <TableCell>{formatCurrency(p.amount)}</TableCell>
-                                            <TableCell>{p.managedBy}</TableCell>
-                                            <TableCell>{p.transactionNumber}</TableCell>
-                                            <TableCell className="text-right">
-                                                 <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" disabled={p.status === 'ANULADO' || (!canManageCredit && !isFieldUser)}>
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                         {(isFieldUser || canManageCredit) && (
-                                                            <DropdownMenuItem onClick={() => printDocument('receipt', credit.id, p.id, true)}>
-                                                                <Printer className="mr-2 h-4 w-4" /> Reimprimir
-                                                            </DropdownMenuItem>
-                                                         )}
-                                                         {canRequestVoidPayment && p.status === 'VALIDO' && (
-                                                            <DropdownMenuItem onClick={() => handleOpenVoidModal(p)} className="text-amber-600 focus:bg-amber-100 focus:text-amber-900">
-                                                                <ShieldAlert className="mr-2 h-4 w-4" /> Solicitar Anulación
-                                                            </DropdownMenuItem>
-                                                         )}
-                                                         {canVoidPayment && p.status === 'ANULACION_PENDIENTE' && (
-                                                            <DropdownMenuItem onClick={() => handleOpenVoidModal(p)} className="text-green-600 focus:bg-green-100 focus:text-green-900">
-                                                                <CheckCircle className="mr-2 h-4 w-4" /> Aprobar Anulación
-                                                            </DropdownMenuItem>
-                                                         )}
-                                                         {canVoidPayment && p.status === 'VALIDO' && (
-                                                            <DropdownMenuItem onClick={() => handleOpenVoidModal(p)} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">
-                                                                <Trash2 className="mr-2 h-4 w-4" /> Anular Pago
-                                                            </DropdownMenuItem>
-                                                         )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))) : (
-                                         <TableRow><TableCell colSpan={5} className="text-center">No hay abonos registrados.</TableCell></TableRow>
+                                            <TableRow key={p.id} className={p.status === 'ANULADO' ? 'text-muted-foreground line-through' : ''}>
+                                                <TableCell>{`${formatDate(p.paymentDate)}, ${formatTime(p.paymentDate)}`}</TableCell>
+                                                <TableCell>{formatCurrency(p.amount)}</TableCell>
+                                                <TableCell>{p.managedBy}</TableCell>
+                                                <TableCell>{p.transactionNumber}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" disabled={p.status === 'ANULADO' || (!canManageCredit && !isFieldUser)}>
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            {(isFieldUser || canManageCredit) && (
+                                                                <DropdownMenuItem onClick={() => printDocument('receipt', credit.id, p.id, true)}>
+                                                                    <Printer className="mr-2 h-4 w-4" /> Reimprimir
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {canRequestVoidPayment && p.status === 'VALIDO' && (
+                                                                <DropdownMenuItem onClick={() => handleOpenVoidModal(p)} className="text-amber-600 focus:bg-amber-100 focus:text-amber-900">
+                                                                    <ShieldAlert className="mr-2 h-4 w-4" /> Solicitar Anulación
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {canVoidPayment && p.status === 'ANULACION_PENDIENTE' && (
+                                                                <DropdownMenuItem onClick={() => handleOpenVoidModal(p)} className="text-green-600 focus:bg-green-100 focus:text-green-900">
+                                                                    <CheckCircle className="mr-2 h-4 w-4" /> Aprobar Anulación
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {canVoidPayment && p.status === 'VALIDO' && (
+                                                                <DropdownMenuItem onClick={() => handleOpenVoidModal(p)} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">
+                                                                    <Trash2 className="mr-2 h-4 w-4" /> Anular Pago
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))) : (
+                                        <TableRow><TableCell colSpan={5} className="text-center">No hay abonos registrados.</TableCell></TableRow>
                                     )}
                                 </TableBody>
-                             </Table>
-                             <div className="mt-4 border-t pt-4 space-y-2">
+                            </Table>
+                            <div className="mt-4 border-t pt-4 space-y-2">
                                 <div className="flex justify-between items-center text-sm font-medium">
                                     <span className="text-muted-foreground">Monto Total del Crédito:</span>
                                     <span className="text-blue-600 font-bold">{formatCurrency(credit.totalAmount)}</span>
@@ -511,8 +516,8 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                     </Card>
                 </TabsContent>
             </Tabs>
-             {deviceType === 'mobile' ? (
-                <PaymentForm 
+            {deviceType === 'mobile' ? (
+                <PaymentForm
                     isOpen={isPaymentModalOpen}
                     onClose={() => setIsPaymentModalOpen(false)}
                     onSubmit={handlePaymentSubmit}
@@ -541,7 +546,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                     <AlertDialogHeader>
                         <AlertDialogTitle>¿Confirmar reversión?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción cambiará el estado del crédito de "Activo" a "Aprobado" y restablecerá los datos del desembolso. 
+                            Esta acción cambiará el estado del crédito de "Activo" a "Aprobado" y restablecerá los datos del desembolso.
                             Si este desembolso canceló un crédito anterior, ese crédito volverá a su estado "Activo" con su saldo original.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -555,29 +560,29 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                 </AlertDialogContent>
             </AlertDialog>
             <AlertDialog open={isVoidModalOpen} onOpenChange={setIsVoidModalOpen}>
-                 <AlertDialogContent>
+                <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
                             {paymentToVoid?.status === 'ANULACION_PENDIENTE' ? 'Aprobar Anulación de Pago' : 'Solicitar/Anular Pago'}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            {paymentToVoid?.status === 'ANULACION_PENDIENTE' 
+                            {paymentToVoid?.status === 'ANULACION_PENDIENTE'
                                 ? `El gestor ${paymentToVoid.voidRequestedBy} solicitó anular este pago por el siguiente motivo: "${paymentToVoid.voidReason}". ¿Desea aprobar la anulación?`
                                 : 'Para solicitar la anulación o anular directamente este pago, debes indicar un motivo claro para la auditoría.'
                             }
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                     {paymentToVoid?.status !== 'ANULACION_PENDIENTE' && (
+                    {paymentToVoid?.status !== 'ANULACION_PENDIENTE' && (
                         <div className="py-4 space-y-2">
                             <Label htmlFor="void-reason">Motivo de la anulación</Label>
                             <Input id="void-reason" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Ej: Pago duplicado, error de monto" />
                         </div>
-                     )}
+                    )}
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction onClick={handleVoidAction} disabled={(paymentToVoid?.status !== 'ANULACION_PENDIENTE' && !voidReason.trim()) || isLoading}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                             {paymentToVoid?.status === 'ANULACION_PENDIENTE' ? 'Aprobar Anulación' : 'Confirmar Anulación'}
+                            {paymentToVoid?.status === 'ANULACION_PENDIENTE' ? 'Aprobar Anulación' : 'Confirmar Anulación'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -587,7 +592,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                     <AlertDialogHeader>
                         <AlertDialogTitle>¿Confirmar fallecimiento?</AlertDialogTitle>
                         <AlertDialogDescription>
-                           Esta acción marcará el crédito como "Fallecido", cancelará el saldo pendiente y lo sacará de la cartera activa. Esta acción no se puede deshacer.
+                            Esta acción marcará el crédito como "Fallecido", cancelará el saldo pendiente y lo sacará de la cartera activa. Esta acción no se puede deshacer.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -606,7 +611,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
 const StatCard = ({ title, value, className, icon: Icon }: { title: string, value: string, className?: string, icon?: React.ElementType }) => (
     <Card className="p-4 bg-muted/40">
         <p className="text-sm text-muted-foreground flex items-center gap-2">
-            {Icon && <Icon className="h-4 w-4"/>}
+            {Icon && <Icon className="h-4 w-4" />}
             {title}
         </p>
         <p className={`text-2xl font-bold ${className}`}>{value}</p>
@@ -618,4 +623,4 @@ const StatCard = ({ title, value, className, icon: Icon }: { title: string, valu
 
 
 
-      
+

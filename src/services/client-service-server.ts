@@ -6,7 +6,7 @@ import type { Client, AppUser as User, ClientInteraction, CreditDetail } from '@
 import { normalizeString, calculateCreditStatusDetails, decodeData, encodeData } from '@/lib/utils';
 import { createLog } from './audit-log-service';
 import { revalidatePath } from 'next/cache';
-import { getCreditsAdmin } from './credit-service-server';
+import { getCreditsAdmin, getCredit } from './credit-service-server';
 import { getPaidCreditsForGestor } from './portfolio-service';
 
 export async function createClient(
@@ -239,15 +239,38 @@ export const getClients = async (options: { searchTerm?: string; user?: User, fo
     })) as Client[];
     
     if (user?.role === 'GESTOR' && !forSearch) {
-      const { credits: activeCredits } = await getCreditsAdmin({ gestorName: user.fullName, status: 'Active', user });
+      const { credits: basicActiveCredits } = await getCreditsAdmin({ gestorName: user.fullName, status: 'Active', user });
       const paidCredits = await getPaidCreditsForGestor(user.fullName, 30);
 
-      const activeClientIds = new Set(activeCredits.map(c => c.clientId));
+      const activeClientIds = new Set(basicActiveCredits.map(c => c.clientId));
       
-      const eligibleCredits = activeCredits.filter(c => {
+      // Obtener créditos completos con pagos para calcular correctamente el porcentaje pagado
+      const activeCreditsWithPayments = await Promise.all(
+          basicActiveCredits.map(async (credit) => {
+              const fullCredit = await getCredit(credit.id);
+              return fullCredit;
+          })
+      );
+      
+      // Filtrar créditos nulos y luego aplicar la lógica de elegibilidad
+      const validCredits = activeCreditsWithPayments.filter((c): c is CreditDetail => c !== null);
+      
+      const eligibleCredits = validCredits.filter((c) => {
           if (!c) return false;
           const { remainingBalance } = calculateCreditStatusDetails(c);
-          const paidPercentage = c.totalAmount > 0 ? ((c.totalAmount - remainingBalance) / c.totalAmount) * 100 : 0;
+          const totalPaid = c.totalAmount - remainingBalance;
+          const paidPercentage = c.totalAmount > 0 ? (totalPaid / c.totalAmount) * 100 : 0;
+          
+          // Log para debugging
+          console.log(`Cliente ${c.clientName}:`, {
+              totalAmount: c.totalAmount,
+              remainingBalance: remainingBalance,
+              totalPaid: totalPaid,
+              paidPercentage: paidPercentage.toFixed(2) + '%',
+              eligible: paidPercentage >= 75,
+              paymentsCount: c.registeredPayments?.length || 0
+          });
+          
           return paidPercentage >= 75;
       });
 
@@ -257,7 +280,7 @@ export const getClients = async (options: { searchTerm?: string; user?: User, fo
           reloanClients = clients.filter(c => eligibleClientIds.includes(c.id));
       }
 
-      const paidClientIds = paidCredits.map(c => c.clientId);
+      const paidClientIds = paidCredits.map((c: any) => c.clientId);
       let renewalClients: Client[] = [];
       if (paidClientIds.length > 0) {
           renewalClients = clients
@@ -266,7 +289,7 @@ export const getClients = async (options: { searchTerm?: string; user?: User, fo
           
       const gestorClientIds = new Set(clients.map(c => c.id));
       const allGestorClientsData = clients.filter(c => gestorClientIds.has(c.id)).map(client => {
-          const latestCredit = activeCredits.find(ac => ac.clientId === client.id);
+          const latestCredit = basicActiveCredits.find((ac: any) => ac.clientId === client.id);
           return { ...client, latestCreditId: latestCredit?.id };
       });
 

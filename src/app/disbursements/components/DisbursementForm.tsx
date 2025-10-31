@@ -25,7 +25,6 @@ const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', {
 const disbursementFormSchema = z.object({
   amount: z.coerce.number().positive({ message: 'El monto debe ser positivo.' }),
   firstPaymentDate: z.string().refine((date) => !!userInputToISO(date), { message: "Formato de fecha inválido."}),
-  deliveryDate: z.string().refine((date) => !!userInputToISO(date), { message: "Formato de fecha inválido."}),
 });
 
 export type DisbursementFormValues = z.infer<typeof disbursementFormSchema>;
@@ -45,7 +44,6 @@ export function DisbursementForm({ isOpen, onClose, onSubmit, credit }: Disburse
     defaultValues: {
       amount: 0,
       firstPaymentDate: '',
-      deliveryDate: '',
     },
   });
 
@@ -55,7 +53,6 @@ export function DisbursementForm({ isOpen, onClose, onSubmit, credit }: Disburse
       form.reset({
         amount: credit.netDisbursementAmount ?? credit.amount,
         firstPaymentDate: credit.firstPaymentDate ? formatDateForUser(credit.firstPaymentDate, 'yyyy-MM-dd') : '',
-        deliveryDate: today,
       });
     }
   }, [credit, isOpen, form, user]);
@@ -112,22 +109,9 @@ export function DisbursementForm({ isOpen, onClose, onSubmit, credit }: Disburse
               )}
             />
             
-             <FormField
-              control={form.control}
-              name="deliveryDate"
-              render={({ field }) => (
-                <FormItem>
-                   <FormLabel>Fecha de Desembolso (Final)</FormLabel>
-                   <FormControl>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input type="date" {...field} className="pl-8" />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="text-sm p-3 rounded-md bg-blue-50 border-l-4 border-blue-400 text-blue-800">
+              <p><strong>Fecha de Desembolso:</strong> Se registrará automáticamente al confirmar (hoy: {formatDateForUser(todayInNicaragua())})</p>
+            </div>
 
             <FormField
               control={form.control}

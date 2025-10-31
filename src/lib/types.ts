@@ -208,6 +208,7 @@ export interface CreditDetail extends CreditApplication {
     createdBy?: string;
     approvedBy?: string | null;
     lastModifiedBy?: string;
+    updatedAt?: string; // ISO String - timestamp automático de la base de datos
     creditPromoter: string;
     paymentPlan: Payment[];
     registeredPayments?: RegisteredPayment[];

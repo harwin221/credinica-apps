@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { es } from 'date-fns/locale';
+import { formatDateForUser } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
 import { DollarSign, Printer, Undo2, MoreHorizontal, Trash2, FileSignature, Loader2, ShieldAlert, HeartOff, CheckCircle } from 'lucide-react';
 import { PaymentForm, PaymentFormValues } from './PaymentForm';
@@ -167,7 +168,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
 
         try {
              if (isOnline) {
-                const result = await addPayment(credit.id, newPayment, user.id);
+                const result = await addPayment(credit.id, newPayment, user);
                 if(result.success && result.paymentId) {
                     toast({ title: "Pago Registrado", description: `El abono de ${formatCurrency(data.amount)} ha sido registrado.` });
                     if (deviceType === 'mobile') {
@@ -317,7 +318,7 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                                     <div><Label>Creado por</Label><p className="font-medium">{credit.createdBy}</p></div>
                                     <div><Label>Aprobado por</Label><p className="font-medium">{credit.approvedBy}</p></div>
                                     <div><Label>Desembolsado por</Label><p className="font-medium">{credit.disbursedBy}</p></div>
-                                    <div><Label>Última Modificación</Label><p className="font-medium">{credit.lastModifiedBy}</p></div>
+                                    <div><Label>Última Modificación</Label><p className="font-medium">{credit.lastModifiedBy}{credit.updatedAt && ` (${formatDateForUser(credit.updatedAt)})`}</p></div>
                                 </>
                             )}
                         </div>
@@ -335,11 +336,13 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                              <StatCard title="Días de Atraso" value={lateDays.toString()} className="text-destructive" />
                              <StatCard title="Clasificación CONAMI" value={conamiCategory || 'N/A'} icon={ShieldAlert} className={riskVariant} />
                         </CardContent>
-                         <CardFooter className="flex justify-end pt-4">
-                            <Button variant="outline" onClick={() => handlePrintDesktopDocument('promissory-note')}>
-                                <FileSignature className="mr-2 h-4 w-4" /> Imprimir Pagaré
-                            </Button>
-                        </CardFooter>
+                        {!isGestor && (
+                            <CardFooter className="flex justify-end pt-4">
+                                <Button variant="outline" onClick={() => handlePrintDesktopDocument('promissory-note')}>
+                                    <FileSignature className="mr-2 h-4 w-4" /> Imprimir Pagaré
+                                </Button>
+                            </CardFooter>
+                        )}
                     </Card>
                 </TabsContent>
 
@@ -397,9 +400,11 @@ export function CreditDetailView({ credit: initialCredit, onPaymentSuccess }: Cr
                     <Card>
                         <CardHeader className="flex flex-row justify-between items-center">
                             <CardTitle>Plan de Pagos</CardTitle>
-                            <Button variant="outline" onClick={() => handlePrintDesktopDocument('payment-plan')}>
-                                <Printer className="mr-2 h-4 w-4" /> Imprimir Plan de Pago
-                            </Button>
+                            {!isGestor && (
+                                <Button variant="outline" onClick={() => handlePrintDesktopDocument('payment-plan')}>
+                                    <Printer className="mr-2 h-4 w-4" /> Imprimir Plan de Pago
+                                </Button>
+                            )}
                         </CardHeader>
                         <CardContent>
                             <Table>

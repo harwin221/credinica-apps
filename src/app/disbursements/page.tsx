@@ -11,8 +11,8 @@ import { getClient } from '@/services/client-service-server';
 import { calculateCreditStatusDetails } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, parseISO } from 'date-fns';
-import { todayInNicaragua, formatDateForUser, nowInNicaragua } from '@/lib/date-utils';
+import { format, parseISO, isValid } from 'date-fns';
+import { todayInNicaragua, formatDateForUser, nowInNicaragua, userInputToISO } from '@/lib/date-utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RejectionDialog } from '@/components/RejectionDialog';
 import { DisbursementForm, DisbursementFormValues } from './components/DisbursementForm';
@@ -58,8 +58,53 @@ export default function DisbursementsPage() {
       const activeCredits = allCredits.filter(c => c.status === 'Active');
       const rejectedCredits = allCredits.filter(c => c.status === 'Rejected');
 
-      const disbursedToday = activeCredits.filter(c => c.deliveryDate && format(parseISO(c.deliveryDate), 'yyyy-MM-dd') === todayStr);
-      const deniedToday = rejectedCredits.filter(c => c.approvalDate && format(parseISO(c.approvalDate), 'yyyy-MM-dd') === todayStr);
+      const disbursedToday = activeCredits.filter(c => {
+        if (!c.deliveryDate) return false;
+        try {
+          // Manejar diferentes tipos de fecha
+          let dateToCheck: Date;
+          if (typeof c.deliveryDate === 'string') {
+            dateToCheck = parseISO(c.deliveryDate);
+          } else {
+            // Si es Date object, timestamp u otro formato
+            dateToCheck = new Date(c.deliveryDate);
+          }
+
+          if (!isValid(dateToCheck)) {
+            console.error('Invalid deliveryDate:', c.deliveryDate);
+            return false;
+          }
+
+          return format(dateToCheck, 'yyyy-MM-dd') === todayStr;
+        } catch (error) {
+          console.error('Error parsing deliveryDate:', c.deliveryDate, error);
+          return false;
+        }
+      });
+
+      const deniedToday = rejectedCredits.filter(c => {
+        if (!c.approvalDate) return false;
+        try {
+          // Manejar diferentes tipos de fecha
+          let dateToCheck: Date;
+          if (typeof c.approvalDate === 'string') {
+            dateToCheck = parseISO(c.approvalDate);
+          } else {
+            // Si es Date object, timestamp u otro formato
+            dateToCheck = new Date(c.approvalDate);
+          }
+
+          if (!isValid(dateToCheck)) {
+            console.error('Invalid approvalDate:', c.approvalDate);
+            return false;
+          }
+
+          return format(dateToCheck, 'yyyy-MM-dd') === todayStr;
+        } catch (error) {
+          console.error('Error parsing approvalDate:', c.approvalDate, error);
+          return false;
+        }
+      });
 
       const clientIdsWithPending = [...new Set(approvedCredits.map(c => c.clientId))];
       const relevantActiveCredits = activeCredits.filter(ac => clientIdsWithPending.includes(ac.clientId));
@@ -74,14 +119,30 @@ export default function DisbursementsPage() {
         return { ...credit, outstandingBalance, netDisbursementAmount: netDisbursementAmount > 0 ? netDisbursementAmount : 0 };
       }).sort((a, b) => {
         if (!a.approvalDate || !b.approvalDate) return 0;
-        return parseISO(b.approvalDate).getTime() - parseISO(a.approvalDate).getTime();
+        try {
+          const dateA = typeof a.approvalDate === 'string' ? parseISO(a.approvalDate) : new Date(a.approvalDate);
+          const dateB = typeof b.approvalDate === 'string' ? parseISO(b.approvalDate) : new Date(b.approvalDate);
+          if (!isValid(dateA) || !isValid(dateB)) return 0;
+          return dateB.getTime() - dateA.getTime();
+        } catch (error) {
+          console.error('Error sorting by approvalDate:', error);
+          return 0;
+        }
       });
 
       setCreditLists({
         pending: enhancedPending,
         disbursedToday: disbursedToday.sort((a, b) => {
           if (!a.deliveryDate || !b.deliveryDate) return 0;
-          return parseISO(b.deliveryDate).getTime() - parseISO(a.deliveryDate).getTime();
+          try {
+            const dateA = typeof a.deliveryDate === 'string' ? parseISO(a.deliveryDate) : new Date(a.deliveryDate);
+            const dateB = typeof b.deliveryDate === 'string' ? parseISO(b.deliveryDate) : new Date(b.deliveryDate);
+            if (!isValid(dateA) || !isValid(dateB)) return 0;
+            return dateB.getTime() - dateA.getTime();
+          } catch (error) {
+            console.error('Error sorting by deliveryDate:', error);
+            return 0;
+          }
         }),
         deniedToday: deniedToday
       });
@@ -121,13 +182,22 @@ export default function DisbursementsPage() {
     if (!selectedCredit || !user) return;
     setIsProcessing(true);
     try {
-      if (selectedCredit.outstandingBalance && selectedCredit.outstandingBalance > 0) {
+      // Convertir la fecha del formulario a formato ISO
+      const firstPaymentDateISO = userInputToISO(data.firstPaymentDate);
+      if (!firstPaymentDateISO) {
+        toast({ title: 'Error de Fecha', description: 'La fecha de primera cuota no es válida.', variant: 'destructive' });
+        return;
       }
+
+      if (selectedCredit.outstandingBalance && selectedCredit.outstandingBalance > 0) {
+        // Lógica para manejar saldo pendiente si es necesario
+      }
+
       await updateCreditAction(selectedCredit.id, {
         status: 'Active',
         disbursedAmount: data.amount,
-        firstPaymentDate: data.firstPaymentDate,
-        deliveryDate: data.deliveryDate,
+        firstPaymentDate: firstPaymentDateISO,
+        deliveryDate: nowInNicaragua(), // Fecha automática del desembolso
         disbursedBy: user.fullName,
       }, user);
 

@@ -33,6 +33,8 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toZonedTime } from 'date-fns-tz';
 import { useOnlineStatus } from '@/hooks/use-online-status';
+import { DateInput } from '@/components/ui/date-input';
+import { nowInNicaragua, formatDateForUser } from '@/lib/date-utils';
 
 
 interface PaymentFormProps {
@@ -66,7 +68,7 @@ const createPaymentFormSchema = (maxAmount: number) => z.object({
         .number()
         .positive({ message: 'El monto debe ser positivo.' })
         .max(maxAmount, { message: `El pago no puede exceder el saldo de C$${maxAmount.toFixed(2)}` }),
-    paymentDate: z.string().refine((date) => !isNaN(new Date(date).getTime()), { message: "Formato de fecha inválido."}),
+    paymentDate: z.string().min(1, { message: "Debe seleccionar una fecha válida."}),
 });
 export type PaymentFormValues = z.infer<ReturnType<typeof createPaymentFormSchema>>;
 
@@ -92,16 +94,15 @@ export function PaymentForm({
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
-    defaultValues: { amount: undefined, paymentDate: new Date().toISOString() },
+    defaultValues: { amount: undefined, paymentDate: nowInNicaragua() },
   });
 
 
   React.useEffect(() => {
     if (isOpen) {
-      const nowInNicaragua = toZonedTime(new Date(), 'America/Managua');
       form.reset({
         amount: undefined,
-        paymentDate: nowInNicaragua.toISOString(),
+        paymentDate: nowInNicaragua(),
       });
     }
   }, [isOpen, form]);
@@ -111,9 +112,8 @@ export function PaymentForm({
 
   const handleSubmit = async (data: PaymentFormValues) => {
     setIsSubmitting(true);
-    // Asegurarse que la fecha enviada sea ISO string
-    const dataToSend = { ...data, paymentDate: new Date(data.paymentDate).toISOString() };
-    await onSubmit(dataToSend);
+    // La fecha ya viene en formato ISO desde DateInput
+    await onSubmit(data);
     setIsSubmitting(false);
   };
 
@@ -175,12 +175,12 @@ export function PaymentForm({
                     <FormItem>
                     <FormLabel className="text-left font-semibold">Fecha del Pago</FormLabel>
                      <FormControl>
-                        <Input 
-                            type="date"
-                            {...field}
-                            value={format(parseISO(field.value), 'yyyy-MM-dd')}
-                            onChange={(e) => field.onChange(new Date(e.target.value).toISOString())}
+                        <DateInput
+                            value={field.value}
+                            onChange={(isoValue) => field.onChange(isoValue)}
+                            placeholder="Seleccionar fecha del pago"
                             className="h-12 text-center text-lg bg-muted rounded-xl"
+                            required
                         />
                     </FormControl>
                     <FormMessage />

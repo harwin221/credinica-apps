@@ -1,9 +1,9 @@
 
 'use server';
 
-import type { CreditApplication, CreditDetail, User, UserRole, RegisteredPayment } from '@/lib/types';
-import { 
-    addCredit as addCreditService, 
+import type { CreditApplication, CreditDetail, AppUser as User, RegisteredPayment } from '@/lib/types';
+import {
+    addCredit as addCreditService,
     updateCredit as updateCreditService,
     revertDisbursement as revertDisbursementService,
     addPayment as addPaymentService,
@@ -11,12 +11,11 @@ import {
     requestVoidPayment as requestVoidPaymentService,
     getClientCredits as getClientCreditsService
 } from '@/services/credit-service-server';
-import { calculateCreditStatusDetails } from '@/lib/utils';
-import { getCredit } from '@/services/credit-service-server';
+// Importaciones limpias - solo las necesarias
 
 
 // Esta es una acción de servidor para añadir un crédito
-export async function addCredit(creditData: Partial<CreditApplication> & { deliveryDate?: string }, creator: User): Promise<{ success: boolean; creditId?: string; error?: string }> {
+export async function addCredit(creditData: Partial<CreditApplication>, creator: User): Promise<{ success: boolean; creditId?: string; error?: string }> {
     return addCreditService(creditData, creator);
 }
 
@@ -37,9 +36,16 @@ export async function voidPayment(creditId: string, paymentId: string, actor: Us
     return voidPaymentService(creditId, paymentId, actor);
 }
 
-export async function addPayment(creditId: string, paymentData: Omit<RegisteredPayment, 'id'>, actorId: string): Promise<{ success: boolean; error?: string, paymentId?: string }> {
-    const actor = await getCredit(actorId); // This is incorrect, should be getUser
-    // This is a placeholder for the actual user fetching logic
-    const actorUser = { id: actorId, fullName: 'Offline User' } as User;
-    return addPaymentService(creditId, paymentData, actorUser);
+export async function addPayment(creditId: string, paymentData: Omit<RegisteredPayment, 'id'>, actor: User): Promise<{ success: boolean; error?: string, paymentId?: string }> {
+    try {
+        // Usar directamente el objeto usuario que se pasa, evitando la consulta adicional
+        if (!actor || !actor.id) {
+            return { success: false, error: 'Información de usuario inválida.' };
+        }
+
+        return addPaymentService(creditId, paymentData, actor);
+    } catch (error) {
+        console.error('Error in addPayment:', error);
+        return { success: false, error: 'Error al procesar el pago.' };
+    }
 }
