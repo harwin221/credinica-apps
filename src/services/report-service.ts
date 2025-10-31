@@ -990,6 +990,66 @@ export async function generateFutureInstallmentsReport(filters: ReportFilters): 
     return { detailed, summary: Object.values(summaryMap) };
 }
 
+export async function generateRejectionAnalysisReport(filters: ReportFilters): Promise<RejectionAnalysisItem[]> {
+    const { sucursales, users, dateFrom, dateTo } = filters;
+    const timeZone = 'America/Managua';
+
+    let sql = `
+        SELECT 
+            c.id as creditId,
+            c.applicationDate,
+            c.clientName,
+            c.branchName as sucursalName,
+            c.amount,
+            c.rejectionReason as reason,
+            c.rejectedBy
+        FROM credits c
+        WHERE c.status = 'Rejected'
+    `;
+    const params: any[] = [];
+
+    if (dateFrom) {
+        sql += ` AND c.applicationDate >= ?`;
+        params.push(fromZonedTime(startOfDay(parseISO(dateFrom)), timeZone));
+    }
+    if (dateTo) {
+        sql += ` AND c.applicationDate <= ?`;
+        params.push(fromZonedTime(endOfDay(parseISO(dateTo)), timeZone));
+    }
+
+    if (sucursales && sucursales.length > 0) {
+        const sucursalPlaceholders = sucursales.map(() => '?').join(',');
+        const sucursalNamesResult: any = await query(`SELECT name FROM sucursales WHERE id IN (${sucursalPlaceholders})`, sucursales);
+        if (Array.isArray(sucursalNamesResult) && sucursalNamesResult.length > 0) {
+            const sucursalNames = sucursalNamesResult.map(s => s.name);
+            const namePlaceholders = sucursalNames.map(() => '?').join(',');
+            sql += ` AND c.branchName IN (${namePlaceholders})`;
+            params.push(...sucursalNames);
+        }
+    }
+
+    if (users && users.length > 0) {
+        const userPlaceholders = users.map(() => '?').join(',');
+        const userNamesResult: any = await query(`SELECT fullName FROM users WHERE id IN (${userPlaceholders})`, users);
+        if (Array.isArray(userNamesResult) && userNamesResult.length > 0) {
+            const userNames = userNamesResult.map(u => u.fullName);
+            const namePlaceholders = userNames.map(() => '?').join(',');
+            sql += ` AND c.rejectedBy IN (${namePlaceholders})`;
+            params.push(...userNames);
+        }
+    }
+
+    sql += ' ORDER BY c.applicationDate DESC';
+
+    const results = await query(sql, params);
+
+    return results.map((row: any) => ({
+        ...row,
+        applicationDate: row.applicationDate ? new Date(row.applicationDate).toISOString() : null,
+    })) as RejectionAnalysisItem[];
+}
+
+
 // --- Excel export functions ---
 
 const createExcelFile = (data: any[], sheetName: string, columns?: {wch: number}[]) => {
