@@ -78,7 +78,12 @@ function LayoutManager({ children }: { children: React.ReactNode }) {
   }
   
   // Si no hay usuario y no es una ruta pública, el middleware ya habrá redirigido.
-  // Mostramos un loader como fallback mientras se completa la redirección.
+  // Mostramos los children, que en caso de not-found, será la página de not-found.
+  if (!user && !isPublicRoute) {
+    return <>{children}</>;
+  }
+
+  // Fallback en caso de que ninguna de las condiciones anteriores se cumpla.
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
