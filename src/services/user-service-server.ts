@@ -90,26 +90,59 @@ export async function updateUserPassword(userId: string, newPassword: string): P
 
 export async function updateUserService(userId: string, userData: Partial<AppUser>): Promise<{ success: boolean; error?: string }> {
     try {
-        const { fullName, email, phone, role, sucursal, sucursalName, active, supervisorId, supervisorName } = userData;
-        const phoneValue = phone || null;
-        const supervisorIdValue = supervisorId || null;
-        const supervisorNameValue = supervisorName || null;
-        
-        let finalSucursalId = sucursal;
-        let finalSucursalName = sucursalName;
+        const updateFields: string[] = [];
+        const values: any[] = [];
 
-        if (sucursal === 'TODAS') {
-            finalSucursalId = null; // Correctly set ID to NULL
-            finalSucursalName = 'TODAS';
-        } else if (sucursal && !sucursalName) {
-            const branchResult: any = await query('SELECT name FROM sucursales WHERE id = ?', [sucursal]);
-            finalSucursalName = branchResult[0]?.name || null;
+        // Mapeo de claves de API a columnas de BD
+        const columnMap: { [key in keyof AppUser]?: string } = {
+            fullName: 'fullName',
+            email: 'email',
+            phone: 'phone',
+            role: 'role',
+            sucursal: 'sucursal_id',
+            sucursalName: 'sucursal_name',
+            active: 'active',
+            supervisorId: 'supervisor_id',
+            supervisorName: 'supervisor_name'
+        };
+
+        // Construir dinámicamente los campos a actualizar
+        for (const key in userData) {
+            if (Object.prototype.hasOwnProperty.call(userData, key)) {
+                const typedKey = key as keyof AppUser;
+                const column = columnMap[typedKey];
+                if (column) {
+                    let value = userData[typedKey];
+                    
+                    // Manejo especial para sucursal 'TODAS'
+                    if (typedKey === 'sucursal' && value === 'TODAS') {
+                        updateFields.push('sucursal_id = ?');
+                        values.push(null);
+                        updateFields.push('sucursal_name = ?');
+                        values.push('TODAS');
+                        continue; // Saltar el procesamiento normal para este campo
+                    }
+
+                    // Convertir undefined a null para la BD
+                    if (value === undefined) {
+                        value = null;
+                    }
+
+                    updateFields.push(`${column} = ?`);
+                    values.push(value);
+                }
+            }
         }
 
-        await query(
-            'UPDATE users SET fullName = ?, email = ?, phone = ?, role = ?, sucursal_id = ?, sucursal_name = ?, active = ?, supervisor_id = ?, supervisor_name = ? WHERE id = ?',
-            [fullName, email, phoneValue, role, finalSucursalId, finalSucursalName, active, supervisorIdValue, supervisorNameValue, userId]
-        );
+        if (updateFields.length === 0) {
+            return { success: true }; // No hay nada que actualizar
+        }
+
+        const sql = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
+        values.push(userId);
+
+        await query(sql, values);
+        
         return { success: true };
     } catch (error: any) {
         console.error("Error updating user:", error);
