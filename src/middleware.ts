@@ -30,8 +30,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
 }
 
+// ==========================================================
+// ESTE BLOQUE ES EL QUE ESTÁ CORREGIDO
+// ==========================================================
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.png$).*)',
+    // La expresión regular ahora excluye:
+    // 1. Rutas internas (api, _next)
+    // 2. Archivos estáticos de la PWA (manifest, sw.js, favicon.ico)
+    // 3. Archivos estáticos de imágenes (*.png)
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.png$|manifest.json|manifest.webmanifest|sw.js).*)',
   ],
 };

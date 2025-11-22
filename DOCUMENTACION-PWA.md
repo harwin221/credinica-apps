@@ -1,8 +1,8 @@
-# 📱 Documentación PWA - CrediNica
+# 📱 Documentación PWA - CrediNic
 
-## 🎯 ¿Qué es el PWA de CrediNica?
+## 🎯 ¿Qué es el PWA de CrediNic?
 
-CrediNica funciona como una **Progressive Web App (PWA)**, lo que significa que puede instalarse en dispositivos móviles y de escritorio como si fuera una aplicación nativa, pero sin necesidad de descargarla desde una tienda de aplicaciones.
+CrediNic funciona como una **Progressive Web App (PWA)**, lo que significa que puede instalarse en dispositivos móviles y de escritorio como si fuera una aplicación nativa, pero sin necesidad de descargarla desde una tienda de aplicaciones.
 
 ## 🔧 Componentes del PWA
 
@@ -12,8 +12,8 @@ Define cómo se ve y comporta la app cuando se instala:
 
 ```json
 {
-  "name": "CrediNica - Sistema de Gestión de Créditos",
-  "short_name": "CrediNica",
+  "name": "CrediNic - Sistema de Gestión de Créditos",
+  "short_name": "CrediNic",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#1f2937",
