@@ -21,7 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-const EDIT_DELETE_ROLES: UserRole[] = ['ADMINISTRADOR', 'OPERATIVO'];
+const EDIT_DELETE_ROLES: UserRole[] = ['ADMINISTRADOR', 'GERENTE', 'OPERATIVO'];
 const PAGE_SIZE = 10;
 
 const formatDate = (dateString?: string) => {
@@ -42,9 +42,11 @@ interface ClientListProps {
     initialRenewalClients?: Client[];
     isGestor: boolean;
     user: User;
+    sucursales?: Array<{ id: string; name: string; }>;
+    initialSucursalFilter?: string;
 }
 
-export function ClientList({ initialClients, initialReloanClients, initialRenewalClients, isGestor, user }: ClientListProps) {
+export function ClientList({ initialClients, initialReloanClients, initialRenewalClients, isGestor, user, sucursales = [], initialSucursalFilter = '' }: ClientListProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -53,16 +55,40 @@ export function ClientList({ initialClients, initialReloanClients, initialRenewa
     const [clients, setClients] = React.useState(initialClients);
     const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null);
     const [currentPage, setCurrentPage] = React.useState(1);
+    const [sucursalFilter, setSucursalFilter] = React.useState(initialSucursalFilter);
 
     const canEditDelete = EDIT_DELETE_ROLES.includes(user.role.toUpperCase() as UserRole);
+    const canDelete = user.role.toUpperCase() === 'ADMINISTRADOR'; // Solo ADMINISTRADOR puede eliminar
+    
+    // Función para verificar si el usuario puede editar un cliente específico
+    const canEditClient = (client: Client) => {
+        if (!canEditDelete) return false;
+        const userRole = user.role.toUpperCase();
+        
+        // ADMINISTRADOR puede editar cualquier cliente
+        if (userRole === 'ADMINISTRADOR') return true;
+        
+        // GERENTE y OPERATIVO solo pueden editar clientes de su sucursal
+        if (['GERENTE', 'OPERATIVO'].includes(userRole)) {
+            return client.sucursal === user.sucursal;
+        }
+        
+        return false;
+    };
 
     React.useEffect(() => {
         setClients(initialClients);
     }, [initialClients]);
     
+    // Filtrado por sucursal (solo para roles que pueden ver múltiples sucursales)
+    const filteredClients = React.useMemo(() => {
+        if (!sucursalFilter || sucursales.length === 0) return clients;
+        return clients.filter(client => client.sucursal === sucursalFilter);
+    }, [clients, sucursalFilter, sucursales]);
+
     // Filtrado y paginación para la vista de Admin/Oficina
-    const paginatedClients = clients.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-    const maxPage = Math.ceil(clients.length / PAGE_SIZE);
+    const paginatedClients = filteredClients.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const maxPage = Math.ceil(filteredClients.length / PAGE_SIZE);
 
     const handleSearch = useDebouncedCallback((term: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -73,6 +99,17 @@ export function ClientList({ initialClients, initialReloanClients, initialRenewa
         }
         router.replace(`${pathname}?${params.toString()}`);
     }, 300);
+
+    const handleSucursalFilter = (sucursalId: string) => {
+        setSucursalFilter(sucursalId);
+        const params = new URLSearchParams(searchParams.toString());
+        if (sucursalId) {
+            params.set('sucursal', sucursalId);
+        } else {
+            params.delete('sucursal');
+        }
+        router.replace(`${pathname}?${params.toString()}`);
+    };
 
     const handleDeleteClient = async () => {
         if (!clientToDelete || !user) return;
@@ -145,14 +182,37 @@ export function ClientList({ initialClients, initialReloanClients, initialRenewa
         <>
             <Card>
                 <CardContent className="pt-6">
-                    <div className="relative mb-4">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Buscar cliente por nombre, cédula o código..."
-                            defaultValue={searchParams.get('search')?.toString()}
-                            onChange={(e) => handleSearch(e.target.value)}
-                            className="pl-10"
-                        />
+                    <div className="flex gap-4 mb-4">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Buscar cliente por nombre, cédula o código..."
+                                defaultValue={searchParams.get('search')?.toString()}
+                                onChange={(e) => handleSearch(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                        {sucursales.length > 1 && (
+                            <div className="w-64">
+                                <select
+                                    value={sucursalFilter}
+                                    onChange={(e) => handleSucursalFilter(e.target.value)}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <option value="">Todas las sucursales</option>
+                                    {sucursales.map(sucursal => (
+                                        <option key={sucursal.id} value={sucursal.id}>
+                                            {sucursal.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        {sucursales.length === 1 && (
+                            <div className="w-64 flex items-center px-3 py-2 text-sm text-muted-foreground bg-muted rounded-md">
+                                📍 {sucursales[0].name}
+                            </div>
+                        )}
                     </div>
                     <Table>
                         <TableHeader>
@@ -181,7 +241,7 @@ export function ClientList({ initialClients, initialReloanClients, initialRenewa
                                         <TableCell>{client.sucursalName}</TableCell>
                                         <TableCell>{formatDate(client.createdAt)}</TableCell>
                                         <TableCell className="text-right">
-                                            {canEditDelete && (
+                                            {canEditClient(client) && (
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button variant="ghost" size="icon">
@@ -192,10 +252,14 @@ export function ClientList({ initialClients, initialReloanClients, initialRenewa
                                                         <DropdownMenuItem onSelect={() => router.push(`/clients/${client.id}/edit`)}>
                                                             <Edit className="mr-2 h-4 w-4" /> Editar
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem onSelect={() => setClientToDelete(client)} className="text-destructive">
-                                                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                                                        </DropdownMenuItem>
+                                                        {canDelete && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem onSelect={() => setClientToDelete(client)} className="text-destructive">
+                                                                    <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             )}

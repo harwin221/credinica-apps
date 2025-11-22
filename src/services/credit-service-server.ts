@@ -13,7 +13,8 @@ import {
     nowInNicaragua,
     toNicaraguaTime,
     isoToMySQLDateTime,
-    isoToMySQLDate
+    isoToMySQLDate,
+    formatDateForUser
 } from '@/lib/date-utils';
 import { getUser, getUserByName } from './user-service-server';
 import { getClient } from './client-service-server';
@@ -68,7 +69,7 @@ export async function addCredit(creditData: Partial<CreditApplication> & { deliv
             scheduleData.totalPayment, scheduleData.totalInterest, scheduleData.periodicPayment,
             isoToMySQLDateTime(firstPaymentDate),
             deliveryDate ? isoToMySQLDateTime(deliveryDate) : null,
-            scheduleData.schedule[scheduleData.schedule.length - 1].paymentDate,
+            `${scheduleData.schedule[scheduleData.schedule.length - 1].paymentDate} 12:00:00`,
             gestor.fullName, supervisorUser?.fullName || null, creator.fullName,
             gestor.sucursal || null, gestor.sucursalName || null, productType, subProduct, productDestination
         ]);
@@ -91,7 +92,8 @@ export async function addCredit(creditData: Partial<CreditApplication> & { deliv
 
         if (scheduleData.schedule.length > 0) {
             for (const p of scheduleData.schedule) {
-                await query('INSERT INTO payment_plan (creditId, paymentNumber, paymentDate, amount, principal, interest, balance) VALUES (?, ?, ?, ?, ?, ?, ?)', [newCreditId, p.paymentNumber, `${p.paymentDate} 00:00:00`, p.amount, p.principal, p.interest, p.balance]);
+                // Usar mediodía (12:00:00) para evitar problemas de zona horaria con fechas
+                await query('INSERT INTO payment_plan (creditId, paymentNumber, paymentDate, amount, principal, interest, balance) VALUES (?, ?, ?, ?, ?, ?, ?)', [newCreditId, p.paymentNumber, `${p.paymentDate} 12:00:00`, p.amount, p.principal, p.interest, p.balance]);
             }
         }
 
@@ -113,6 +115,24 @@ export async function addCredit(creditData: Partial<CreditApplication> & { deliv
 
 export async function updateCredit(id: string, creditData: Partial<CreditDetail>, actor: User): Promise<{ success: boolean; error?: string }> {
     try {
+        // Verificar permisos de edición
+        const actorRole = actor.role.toUpperCase();
+        if (!['ADMINISTRADOR', 'GERENTE', 'OPERATIVO'].includes(actorRole)) {
+            return { success: false, error: 'No tienes permisos para editar créditos.' };
+        }
+
+        // Si es GERENTE u OPERATIVO, verificar que el crédito pertenece a su sucursal
+        if (['GERENTE', 'OPERATIVO'].includes(actorRole)) {
+            const creditRows: any = await query('SELECT branch FROM credits WHERE id = ? LIMIT 1', [id]);
+            if (creditRows.length === 0) {
+                return { success: false, error: 'Crédito no encontrado.' };
+            }
+            
+            if (creditRows[0].branch !== actor.sucursal) {
+                return { success: false, error: 'No tienes permisos para editar este crédito.' };
+            }
+        }
+
         const { paymentPlan, registeredPayments, clientDetails, guarantees, guarantors, ...fieldsToUpdate } = creditData;
 
         // Handle lookup for supervisor and collectionsManager names
@@ -209,6 +229,11 @@ export async function updateCredit(id: string, creditData: Partial<CreditDetail>
 
 export async function deleteCredit(id: string, actor: User): Promise<{ success: boolean; error?: string }> {
     try {
+        // Solo ADMINISTRADOR puede eliminar créditos
+        if (actor.role.toUpperCase() !== 'ADMINISTRADOR') {
+            return { success: false, error: 'No tienes permisos para eliminar créditos.' };
+        }
+
         await query('DELETE FROM credits WHERE id = ?', [id]);
         await createLog(actor, 'credit:delete', `Eliminó el crédito con ID ${id}.`, { targetId: id });
         revalidatePath('/credits');
@@ -260,7 +285,13 @@ export async function getCredit(id: string): Promise<CreditDetail | null> {
 
 
 export async function getClientCredits(clientId: string): Promise<CreditDetail[]> {
-    const creditRows = await query('SELECT * FROM credits WHERE clientId = ? ORDER BY applicationDate DESC', [clientId]);
+    const creditRows: any[] = await query('SELECT * FROM credits WHERE clientId = ? ORDER BY applicationDate DESC', [clientId]);
+
+    for (const credit of creditRows) {
+        const registeredPaymentRows: any = await query('SELECT * FROM payments_registered WHERE creditId = ? ORDER BY paymentDate DESC', [credit.id]);
+        credit.registeredPayments = registeredPaymentRows.map((p: any) => ({ ...p, paymentDate: toISOStringSafe(p.paymentDate) }));
+    }
+
     return creditRows as CreditDetail[];
 }
 
@@ -339,8 +370,25 @@ export async function getCreditsAdmin(filters: { status?: CreditStatus, gestorNa
         params.push(filters.gestorName);
     }
     if (filters.sucursales && filters.sucursales.length > 0) {
-        whereClauses.push(`sucursal_id IN (?)`);
-        params.push(filters.sucursales);
+        const placeholders = filters.sucursales.map(() => '?').join(',');
+        whereClauses.push(`branch IN (${placeholders})`);
+        params.push(...filters.sucursales);
+    }
+
+    // Filtrado por rol de usuario para restricciones de sucursal
+    if (filters.user) {
+        const userRole = filters.user.role.toUpperCase();
+        if (userRole === 'GERENTE' || userRole === 'OPERATIVO' || userRole === 'SUPERVISOR') {
+            // Estos roles solo ven créditos de su sucursal
+            if (filters.user.sucursal) {
+                whereClauses.push('branch = ?');
+                params.push(filters.user.sucursal);
+            } else {
+                // Si no tienen sucursal asignada, no pueden ver ningún crédito
+                whereClauses.push('1 = 0');
+            }
+        }
+        // ADMINISTRADOR y FINANZAS pueden ver todos los créditos (sin filtro adicional)
     }
     if (filters.clientIds && filters.clientIds.length > 0) {
         whereClauses.push('clientId IN (?)');
@@ -388,7 +436,8 @@ export async function searchActiveCreditsGlobally(searchTerm: string, actor?: Us
 }
 
 export async function getPaidCreditsForGestor(gestorName: string, monthsAgo: number): Promise<CreditDetail[]> {
-    const dateLimit = new Date();
+    const now = toNicaraguaTime(nowInNicaragua());
+    const dateLimit = new Date(now);
     dateLimit.setMonth(dateLimit.getMonth() - monthsAgo);
 
     const sql = `
@@ -456,28 +505,32 @@ export async function revalidateActiveCreditsStatus(): Promise<{ success: boolea
         const activeCredits = (await query("SELECT * FROM credits WHERE status = 'Active'")) as any[];
         let updatedCount = 0;
 
+        // Optimización: Obtener holidays una sola vez
+        const holidays = (await query("SELECT date FROM holidays")) as any[];
+        const holidayDates = holidays.map((h: any) => formatDateForUser(h.date, 'yyyy-MM-dd'));
+
         for (const credit of activeCredits) {
-            const holidays = (await query("SELECT date FROM holidays")) as any[];
-            const holidayDates = holidays.map((h: any) => format(new Date(h.date), 'yyyy-MM-dd'));
 
             const scheduleData = generatePaymentSchedule({
                 loanAmount: credit.principalAmount,
                 monthlyInterestRate: credit.interestRate,
                 termMonths: credit.termMonths,
                 paymentFrequency: credit.paymentFrequency,
-                startDate: format(new Date(credit.firstPaymentDate), 'yyyy-MM-dd'),
+                startDate: formatDateForUser(credit.firstPaymentDate, 'yyyy-MM-dd'),
                 holidays: holidayDates
             });
 
             if (scheduleData) {
                 // Actualizar la fecha de vencimiento en el registro principal del crédito
                 const newDueDate = scheduleData.schedule[scheduleData.schedule.length - 1].paymentDate;
-                await query('UPDATE credits SET dueDate = ? WHERE id = ?', [newDueDate, credit.id]);
+                // Agregar hora del mediodía para evitar problemas de zona horaria
+                await query('UPDATE credits SET dueDate = ? WHERE id = ?', [`${newDueDate} 12:00:00`, credit.id]);
 
                 // Borrar y volver a insertar el plan de pagos
                 await query('DELETE FROM payment_plan WHERE creditId = ?', [credit.id]);
                 for (const p of scheduleData.schedule) {
-                    await query('INSERT INTO payment_plan (creditId, paymentNumber, paymentDate, amount, principal, interest, balance) VALUES (?, ?, ?, ?, ?, ?, ?)', [credit.id, p.paymentNumber, `${p.paymentDate} 00:00:00`, p.amount, p.principal, p.interest, p.balance]);
+                    // Usar mediodía (12:00:00) para evitar problemas de zona horaria con fechas
+                    await query('INSERT INTO payment_plan (creditId, paymentNumber, paymentDate, amount, principal, interest, balance) VALUES (?, ?, ?, ?, ?, ?, ?)', [credit.id, p.paymentNumber, `${p.paymentDate} 12:00:00`, p.amount, p.principal, p.interest, p.balance]);
                 }
                 updatedCount++;
             }

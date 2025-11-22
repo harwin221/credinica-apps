@@ -10,7 +10,7 @@ import * as React from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { createUser, updateUserAction } from "@/app/settings/users/actions"
-import { CreateUserInputSchema } from "@/lib/types"
+import { CreateUserInputSchema, AppUser } from "@/lib/types"
 import { USER_ROLES } from "@/lib/constants"
 import { Loader2, Phone, Check, ChevronsUpDown } from "lucide-react"
 import { formatPhone } from "@/lib/utils"
@@ -22,21 +22,9 @@ import { Badge } from "@/components/ui/badge"
 import { getSucursales } from "@/services/sucursal-service"
 import { getUsers as getUsersClient } from "@/services/user-service-client"
 
-type User = { 
-  id: string,
-  fullName: string,
-  email: string,
-  phone?: string;
-  role: string,
-  sucursal?: string;
-  sucursalName?: string;
-  active: boolean,
-  supervisorId?: string,
-};
-
 type UserFormProps = {
   onFinished: () => void;
-  initialData?: User | null;
+  initialData?: AppUser | null;
 }
 
 const GLOBAL_ACCESS_ROLES = ['ADMINISTRADOR', 'FINANZAS'];
@@ -105,7 +93,7 @@ export function UserForm({ onFinished, initialData }: UserFormProps) {
       phone: initialData?.phone || "",
       role: initialData?.role || "",
       branch: initialData?.sucursal || "",
-      status: initialData?.active ?? true,
+      status: initialData?.active !== false,
       supervisorId: initialData?.supervisorId || "",
     },
   })
@@ -138,7 +126,7 @@ export function UserForm({ onFinished, initialData }: UserFormProps) {
         phone: initialData.phone || '',
         role: initialData.role,
         branch: initialData.sucursal || (GLOBAL_ACCESS_ROLES.includes(initialData.role) ? 'TODAS' : ''),
-        status: initialData.active,
+        status: initialData.active !== false,
         password: "", // La contraseña no se obtiene para editar
         supervisorId: initialData.supervisorId || "",
       });
@@ -235,7 +223,7 @@ export function UserForm({ onFinished, initialData }: UserFormProps) {
               <FormItem>
                 <FormLabel>Correo Electrónico</FormLabel>
                 <FormControl>
-                  <Input type="email" placeholder="Ej: usuario@credinica.com" {...field} className="normal-case"/>
+                  <Input type="email" placeholder="Ej: usuario@credinic.com" {...field} className="normal-case"/>
                 </FormControl>
                 <FormMessage />
               </FormItem>

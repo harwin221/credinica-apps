@@ -8,6 +8,7 @@ import { calculateCreditStatusDetails } from '@/lib/utils';
 import { parseISO, isValid } from 'date-fns';
 import { getClient } from '@/services/client-service-server';
 import { getCredit as getCreditServer } from '@/services/credit-service-server';
+import { toISOString } from '@/lib/date-utils';
 
 
 interface HtmlReceiptOutput {
@@ -26,8 +27,7 @@ const toISOStringSafe = (date: any): string | undefined => {
             if (isValid(parsed)) return parsed.toISOString();
         }
          if (typeof date === 'number') {
-            const d = new Date(date);
-            if (isValid(d)) return d.toISOString();
+            return toISOString(date);
         }
     } catch (e) {
         console.error("toISOStringSafe falló para la fecha:", date, e);
@@ -81,7 +81,11 @@ export async function generateReceiptHtml({ creditId, paymentId, isReprint }: Ge
         // Filtrar pagos realizados ANTES del pago actual para obtener el estado pre-pago.
         const paymentsBeforeCurrent = (credit.registeredPayments || [])
             .filter(p => p.status !== 'ANULADO')
-            .filter(p => new Date(p.paymentDate) < new Date(paymentToPrint.paymentDate));
+            .filter(p => {
+                const pDate = toISOString(p.paymentDate);
+                const printDate = toISOString(paymentToPrint.paymentDate);
+                return pDate && printDate && pDate < printDate;
+            });
 
         const creditStateBeforePayment = { ...credit, registeredPayments: paymentsBeforeCurrent };
         

@@ -113,13 +113,24 @@ export default function SucursalesPage() {
   return (
     <>
     <div className="space-y-6">
-      <div className="flex justify-end">
-        {canCreate && (
-            <Button onClick={() => handleOpenForm(null)}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Agregar Sucursal
-            </Button>
-        )}
+      {/* Botón de regresar */}
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          onClick={() => router.push('/settings')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Regresar a Configuración
+        </Button>
+        <div>
+          {canCreate && (
+              <Button onClick={() => handleOpenForm(null)}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Agregar Sucursal
+              </Button>
+          )}
+        </div>
       </div>
       <Card>
         <CardHeader>

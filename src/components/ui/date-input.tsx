@@ -1,13 +1,11 @@
 /**
  * Componente de input de fecha con manejo automático de zona horaria
+ * REESCRITO para eliminar bucles infinitos, siguiendo un patrón de componente controlado estándar.
  */
-
 import React from 'react';
 import { Input } from './input';
-import { Button } from './button';
-import { Calendar } from 'lucide-react';
-import { useDateInput } from '@/hooks/use-date-input';
 import { cn } from '@/lib/utils';
+import { formatDateForUser, userInputToISO } from '@/lib/date-utils';
 
 interface DateInputProps {
   value?: string | null;
@@ -25,43 +23,36 @@ export const DateInput: React.FC<DateInputProps> = ({
   value,
   onChange,
   placeholder = 'Seleccionar fecha',
-  required = false,
   disabled = false,
   className,
   minDate,
   maxDate,
   error: externalError
 }) => {
-  const {
-    displayValue,
-    isoValue,
-    error: internalError,
-    isValid,
-    handleChange,
-    setToday,
-    setFromISO
-  } = useDateInput({
-    initialValue: value,
-    required,
-    minDate,
-    maxDate
-  });
+  // Derivamos el valor a mostrar en el input ('yyyy-MM-dd') a partir del `value` del padre.
+  const displayValue = React.useMemo(() => {
+    if (!value) return ''; // Si el valor del padre es null o '', el input se muestra vacío.
+    const formatted = formatDateForUser(value, 'yyyy-MM-dd');
+    // Si la fecha es inválida, devolvemos un string vacío para no mostrar texto de error en el input.
+    return (formatted && formatted !== 'N/A' && formatted !== 'Fecha Inválida') ? formatted : '';
+  }, [value]);
 
-  // Sincronizar con el valor externo
-  React.useEffect(() => {
-    if (value !== isoValue) {
-      setFromISO(value);
+  // Cuando el usuario cambia la fecha en el input.
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!onChange) return;
+
+    const newDisplayValue = e.target.value; // Formato 'yyyy-MM-dd' o ''.
+
+    if (!newDisplayValue) {
+      // Si el input se vacía, notificamos al padre con un string vacío,
+      // que es lo que el formulario espera.
+      onChange('');
+    } else {
+      // Si se selecciona una fecha, la convertimos a ISO y notificamos al padre.
+      const newIsoValue = userInputToISO(newDisplayValue);
+      onChange(newIsoValue);
     }
-  }, [value, isoValue, setFromISO]);
-
-  // Notificar cambios al componente padre
-  React.useEffect(() => {
-    if (onChange && isoValue !== value) {
-      onChange(isoValue);
-    }
-  }, [isoValue, onChange, value]);
-
-  const error = externalError || internalError;
+  };
 
   return (
     <div className="space-y-1">
@@ -69,32 +60,19 @@ export const DateInput: React.FC<DateInputProps> = ({
         <Input
           type="date"
           value={displayValue}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={handleChange}
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
             className,
-            error && "border-red-500 focus:border-red-500"
+            externalError && "border-red-500 focus:border-red-500"
           )}
           min={minDate}
           max={maxDate}
         />
-        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={setToday}
-            disabled={disabled}
-            className="h-6 w-6 p-0"
-            title="Fecha actual"
-          >
-            <Calendar className="h-3 w-3" />
-          </Button>
-        </div>
       </div>
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
+      {externalError && (
+        <p className="text-sm text-red-600">{externalError}</p>
       )}
     </div>
   );

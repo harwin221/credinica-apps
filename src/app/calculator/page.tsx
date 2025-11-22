@@ -33,7 +33,10 @@ const calculatorSchema = z.object({
 type CalculatorFormValues = z.infer<typeof calculatorSchema>;
 
 const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const formatDate = (date: string) => format(parseISO(date), 'dd/MM/yyyy', { locale: es });
+const formatDate = (date: string) => {
+    const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date + 'T12:00:00' : date;
+    return format(parseISO(dateToFormat), 'dd/MM/yyyy', { locale: es });
+};
 
 export default function CalculatorPage() {
   const { user } = useUser();

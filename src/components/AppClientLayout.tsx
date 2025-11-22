@@ -10,6 +10,7 @@ import { useOnlineStatus } from '@/hooks/use-online-status';
 import { getPendingPayments, deletePendingPayment } from '@/services/offline-db';
 import { addPayment } from '@/app/credits/actions';
 import { useToast } from '@/hooks/use-toast';
+import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 
 /**
  * Componente interno que maneja la lógica de cliente.
@@ -74,7 +75,12 @@ function LayoutManager({ children }: { children: React.ReactNode }) {
   // Si hay un usuario, siempre se muestra el layout con la barra lateral.
   // El middleware ya se encarga de proteger las rutas no públicas.
   if (user) {
-    return <SidebarLayout>{children}</SidebarLayout>;
+    return (
+      <>
+        <SidebarLayout>{children}</SidebarLayout>
+        <PWAInstallPrompt />
+      </>
+    );
   }
   
   // Si no hay usuario y no es una ruta pública, el middleware ya habrá redirigido.

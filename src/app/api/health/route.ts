@@ -10,7 +10,7 @@ export async function GET() {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       version: '1.0.0',
-      service: 'CrediNica API',
+      service: 'CrediNic API',
       timezone: 'America/Managua'
     });
   } catch (error) {

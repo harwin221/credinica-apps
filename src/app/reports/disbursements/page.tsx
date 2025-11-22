@@ -15,7 +15,11 @@ import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 
 const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const formatDate = (dateString?: string) => dateString ? format(parseISO(dateString), 'dd/MM/yyyy', { locale: es }) : 'N/A';
+const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? dateString + 'T12:00:00' : dateString;
+    return format(parseISO(dateToFormat), 'dd/MM/yyyy', { locale: es });
+};
 
 export default function DisbursementsReportPage() {
   const searchParams = useSearchParams();
@@ -84,7 +88,7 @@ export default function DisbursementsReportPage() {
     );
   }
 
-  const totalDisbursed = reportData.reduce((sum, item) => sum + item.amount, 0);
+  const totalApproved = reportData.reduce((sum, item) => sum + item.approvedAmount, 0);
 
   return (
     <div className="p-4 sm:p-6 print-container bg-white text-black">
@@ -106,7 +110,8 @@ export default function DisbursementsReportPage() {
                     <TableHead>Desembolsado por</TableHead>
                     <TableHead className="text-right">Tasa</TableHead>
                     <TableHead className="text-right">Plazo</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="text-right">Monto Aprobado</TableHead>
+                    <TableHead className="text-right">Monto Entregado</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -119,18 +124,19 @@ export default function DisbursementsReportPage() {
                         <TableCell>{item.disbursedBy}</TableCell>
                         <TableCell className="text-right">{item.interestRate}%</TableCell>
                         <TableCell className="text-right">{item.termMonths} Meses</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.approvedAmount)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
                     </TableRow>
                 ))
                 ) : (
                 <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">No se encontraron desembolsos para los filtros seleccionados.</TableCell>
+                    <TableCell colSpan={8} className="h-24 text-center">No se encontraron desembolsos para los filtros seleccionados.</TableCell>
                 </TableRow>
                 )}
             </TableBody>
         </Table>
          <div className="mt-4 text-right font-bold text-base pr-4">
-            Total Desembolsado: {formatCurrency(totalDisbursed)}
+            Total Aprobado: {formatCurrency(totalApproved)}
         </div>
       </div>
     </div>

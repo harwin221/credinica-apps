@@ -51,7 +51,7 @@ export function SucursalForm({ isOpen, onClose, onSuccess, initialData }: Sucurs
 
       const fetchManagers = async () => {
         const users = await getUsersClient();
-        setManagers(users.filter(u => u.role === 'ADMINISTRADOR' || u.role === 'SUPERVISOR'));
+        setManagers(users.filter(u => u.role === 'ADMINISTRADOR' || u.role === 'GERENTE'));
       };
       fetchManagers();
     }

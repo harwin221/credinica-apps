@@ -33,7 +33,8 @@ const formatNumber = (amount?: number, decimals = 2) => {
 const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     try {
-        return format(parseISO(dateString), 'dd-MM-yyyy', { locale: es });
+        const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? dateString + 'T12:00:00' : dateString;
+        return format(parseISO(dateToFormat), 'dd-MM-yyyy', { locale: es });
     } catch { return 'Fecha Inválida'; }
 };
 

@@ -2,9 +2,10 @@
 'use server';
 
 import { query } from '@/lib/mysql';
-import type { User } from '@/lib/types';
-import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
-import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import type { AppUser } from '@/lib/types';
+import { startOfDay, endOfDay } from 'date-fns';
+import { fromZonedTime } from 'date-fns-tz';
+import { toISOString, nowInNicaragua, toNicaraguaTime } from '@/lib/date-utils';
 
 export interface DailyTransaction {
   id: string;
@@ -32,7 +33,7 @@ export async function generateDailyActivityReport(userId: string): Promise<Daily
     const userName = userResult[0].fullName;
 
     const timeZone = 'America/Managua';
-    const nowInManagua = toZonedTime(new Date(), timeZone);
+    const nowInManagua = toNicaraguaTime(nowInNicaragua());
     const startOfDayInManagua = startOfDay(nowInManagua);
     const endOfDayInManagua = endOfDay(nowInManagua);
     
@@ -59,7 +60,7 @@ export async function generateDailyActivityReport(userId: string): Promise<Daily
             type: 'Payment',
             amount: p.amount,
             description: p.clientName,
-            timestamp: new Date(p.paymentDate).toISOString(),
+            timestamp: toISOString(p.paymentDate) || nowInNicaragua(),
         });
     });
 
@@ -79,7 +80,7 @@ export async function generateDailyActivityReport(userId: string): Promise<Daily
             type: 'Disbursement',
             amount: d.disbursedAmount || 0,
             description: d.clientName,
-            timestamp: new Date(d.deliveryDate).toISOString(),
+            timestamp: toISOString(d.deliveryDate) || nowInNicaragua(),
         });
     });
 

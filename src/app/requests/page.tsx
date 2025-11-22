@@ -127,7 +127,7 @@ function CreditApprovalTabs({ user }: { user: User}) {
                   <TableCell className="font-medium">{credit.clientName}</TableCell>
                   <TableCell>{formatCurrency(credit.amount)}</TableCell>
                   <TableCell>{tabType === 'Denied' ? credit.rejectionReason : credit.collectionsManager}</TableCell>
-                  <TableCell>{tabType === 'Denied' ? (credit.approvalDate ? format(parseISO(credit.approvalDate), 'dd/MM/yyyy') : 'N/A') : credit.branchName}</TableCell>
+                  <TableCell>{tabType === 'Denied' ? (credit.approvalDate ? format(typeof credit.approvalDate === 'string' ? parseISO(credit.approvalDate) : credit.approvalDate, 'dd/MM/yyyy') : 'N/A') : credit.branchName}</TableCell>
                   {tabType !== 'Denied' && (
                     <TableCell className="text-right">
                         <DropdownMenu>

@@ -15,7 +15,12 @@ import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 
 const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const formatDate = (dateString?: string) => dateString ? format(parseISO(dateString), 'dd/MM/yyyy HH:mm', { locale: es }) : 'N/A';
+const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    // Si es solo fecha (YYYY-MM-DD), agregar mediodía para evitar problemas de zona horaria
+    const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? dateString + 'T12:00:00' : dateString;
+    return format(parseISO(dateToFormat), 'dd/MM/yyyy HH:mm', { locale: es });
+};
 
 export default function PaymentsReportPage() {
   const searchParams = useSearchParams();

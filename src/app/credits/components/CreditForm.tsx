@@ -103,95 +103,79 @@ export function CreditForm({ initialData }: CreditFormProps) {
   });
 
   const [projectedInstallment, setProjectedInstallment] = React.useState<number | null>(null);
-  const watchedValues = form.watch();
-  const { setValue, watch } = form;
-  const watchedClientId = watch('clientId');
-  const watchedCollectionsManager = watch('collectionsManager');
+  const { setValue } = form;
 
+  // Auto-assign user values only once when user is loaded
   React.useEffect(() => {
-    // Si el usuario es un gestor, auto-asigna su ID y el de su supervisor
-    if (isGestor && user?.id) {
+    if (isGestor && user?.id && !form.getValues('collectionsManager')) {
       setValue('collectionsManager', user.id);
       if (user.supervisorId) {
         setValue('supervisor', user.supervisorId);
       }
     }
-  }, [isGestor, user, setValue]);
+  }, [isGestor, user?.id, user?.supervisorId]);
 
-  React.useEffect(() => {
-    // Si no es gestor (admin, etc.), auto-asigna supervisor al cambiar el gestor
-    if (!isGestor && watchedCollectionsManager && staff.length > 0) {
-      const selectedGestor = staff.find(g => g.id === watchedCollectionsManager);
-      if (selectedGestor && selectedGestor.supervisorId) {
-        setValue('supervisor', selectedGestor.supervisorId);
-      }
-    }
-  }, [watchedCollectionsManager, isGestor, staff, setValue]);
 
-  React.useEffect(() => {
-    const checkActiveCreditsAndLoadGuarantees = async (clientId: string) => {
-      const clientCredits = await getClientCredits(clientId);
 
-      // Check for outstanding balance
-      const activeCredit = clientCredits.find(c => c.status === 'Active');
-      if (activeCredit) {
-        const { remainingBalance } = calculateCreditStatusDetails(activeCredit);
-        setOutstandingBalance(remainingBalance);
-      } else {
-        setOutstandingBalance(null);
-      }
-
-      // Load guarantees from the most recent relevant credit
-      if (!isEditMode) {
-        const mostRecentCredit = clientCredits.find(c => c.status === 'Active') || clientCredits.find(c => c.status === 'Paid');
-        if (mostRecentCredit && mostRecentCredit.guarantees && mostRecentCredit.guarantees.length > 0) {
-          setGuarantees(mostRecentCredit.guarantees);
-          toast({
-            title: "Garantías Cargadas",
-            description: `Se cargaron ${mostRecentCredit.guarantees.length} garantías del crédito anterior.`,
-            variant: "info",
-          });
-        }
-      }
-    };
-
-    if (watchedClientId) {
-      checkActiveCreditsAndLoadGuarantees(watchedClientId);
-    }
-  }, [watchedClientId, isEditMode, toast]);
-
+  // Preselect client only once
   React.useEffect(() => {
     const preselectClient = async (clientId: string) => {
       const client = await getClient(clientId);
       if (client) {
         setSelectedClient(client);
         setValue('clientId', clientId, { shouldValidate: true });
+        // Call handleClientSelection directly without dependency
+        const clientCredits = await getClientCredits(clientId);
+
+        // Check for outstanding balance
+        const activeCredit = clientCredits.find(c => c.status === 'Active');
+        if (activeCredit) {
+          const { remainingBalance } = calculateCreditStatusDetails(activeCredit);
+          setOutstandingBalance(remainingBalance);
+        } else {
+          setOutstandingBalance(null);
+        }
+
+        // Load guarantees from the most recent relevant credit
+        if (!isEditMode) {
+          const mostRecentCredit = clientCredits.find(c => c.status === 'Active') || clientCredits.find(c => c.status === 'Paid');
+          if (mostRecentCredit && mostRecentCredit.guarantees && mostRecentCredit.guarantees.length > 0) {
+            setGuarantees(mostRecentCredit.guarantees);
+            toast({
+              title: "Garantías Cargadas",
+              description: `Se cargaron ${mostRecentCredit.guarantees.length} garantías del crédito anterior.`,
+              variant: "info",
+            });
+          }
+        }
       }
     };
 
-    if (preselectedClientId && !isEditMode) {
+    if (preselectedClientId && !isEditMode && !selectedClient) {
       preselectClient(preselectedClientId);
     }
-    if (isEditMode && initialData) {
+    if (isEditMode && initialData && !selectedClient) {
       preselectClient(initialData.clientId);
     }
-  }, [preselectedClientId, isEditMode, setValue, initialData]);
+  }, [preselectedClientId, isEditMode, initialData?.clientId, selectedClient]);
 
-
+  // Set staff values only once when staff is loaded in edit mode
   React.useEffect(() => {
-    if (isEditMode && initialData && staff.length > 0 && initialData.collectionsManager) {
-      const gestorUser = staff.find(g => g.fullName === initialData.collectionsManager);
-      if (gestorUser?.id) {
-        form.setValue('collectionsManager', gestorUser.id);
+    if (isEditMode && initialData && staff.length > 0) {
+      if (initialData.collectionsManager && !form.getValues('collectionsManager')) {
+        const gestorUser = staff.find(g => g.fullName === initialData.collectionsManager);
+        if (gestorUser?.id) {
+          form.setValue('collectionsManager', gestorUser.id);
+        }
+      }
+      if (initialData.supervisor && !form.getValues('supervisor')) {
+        const supervisorUser = staff.find(s => s.fullName === initialData.supervisor);
+        if (supervisorUser?.id) {
+          form.setValue('supervisor', supervisorUser.id);
+        }
       }
     }
-    if (isEditMode && initialData && staff.length > 0 && initialData.supervisor) {
-      const supervisorUser = staff.find(s => s.fullName === initialData.supervisor);
-      if (supervisorUser?.id) {
-        form.setValue('supervisor', supervisorUser.id);
-      }
-    }
-  }, [isEditMode, initialData, staff, form]);
+  }, [isEditMode, initialData?.collectionsManager, initialData?.supervisor, staff.length]);
 
 
 
@@ -222,15 +206,14 @@ export function CreditForm({ initialData }: CreditFormProps) {
     fetchData();
   }, [user, isGestor]);
 
-  React.useEffect(() => {
-    const { amount, interestRate, termMonths, paymentFrequency, firstPaymentDate } = watchedValues;
+  const calculateInstallment = React.useCallback(() => {
+    const values = form.getValues();
+    const { amount, interestRate, termMonths, paymentFrequency, firstPaymentDate } = values;
 
     if (amount && interestRate && termMonths && paymentFrequency && firstPaymentDate) {
       try {
-        // Convertir fecha ISO a formato yyyy-MM-dd para el cálculo
         const dateString = formatDateForUser(firstPaymentDate, 'yyyy-MM-dd');
 
-        // Verificar que la fecha sea válida
         if (!dateString || dateString === 'N/A' || dateString === 'Fecha Inválida') {
           setProjectedInstallment(null);
           return;
@@ -240,7 +223,7 @@ export function CreditForm({ initialData }: CreditFormProps) {
           loanAmount: amount,
           monthlyInterestRate: interestRate,
           termMonths: termMonths,
-          paymentFrequency: paymentFrequency,
+          paymentFrequency: paymentFrequency as PaymentFrequency,
           startDate: dateString,
           holidays: holidays
         });
@@ -253,8 +236,7 @@ export function CreditForm({ initialData }: CreditFormProps) {
     } else {
       setProjectedInstallment(null);
     }
-
-  }, [watchedValues.amount, watchedValues.interestRate, watchedValues.termMonths, watchedValues.paymentFrequency, watchedValues.firstPaymentDate, holidays]);
+  }, [form, holidays]);
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [comboboxOpen, setComboboxOpen] = React.useState(false);
@@ -424,10 +406,39 @@ export function CreditForm({ initialData }: CreditFormProps) {
                                     filteredClients.map((client) => (
                                       <div
                                         key={client.id}
-                                        onClick={() => {
+                                        onClick={async () => {
                                           setValue('clientId', client.id);
                                           setSelectedClient(client);
                                           setComboboxOpen(false);
+
+                                          // Handle client selection inline
+                                          try {
+                                            const clientCredits = await getClientCredits(client.id);
+
+                                            // Check for outstanding balance
+                                            const activeCredit = clientCredits.find(c => c.status === 'Active');
+                                            if (activeCredit) {
+                                              const { remainingBalance } = calculateCreditStatusDetails(activeCredit);
+                                              setOutstandingBalance(remainingBalance);
+                                            } else {
+                                              setOutstandingBalance(null);
+                                            }
+
+                                            // Load guarantees from the most recent relevant credit
+                                            if (!isEditMode) {
+                                              const mostRecentCredit = clientCredits.find(c => c.status === 'Active') || clientCredits.find(c => c.status === 'Paid');
+                                              if (mostRecentCredit && mostRecentCredit.guarantees && mostRecentCredit.guarantees.length > 0) {
+                                                setGuarantees(mostRecentCredit.guarantees);
+                                                toast({
+                                                  title: "Garantías Cargadas",
+                                                  description: `Se cargaron ${mostRecentCredit.guarantees.length} garantías del crédito anterior.`,
+                                                  variant: "info",
+                                                });
+                                              }
+                                            }
+                                          } catch (error) {
+                                            console.error('Error loading client data:', error);
+                                          }
                                         }}
                                         className="relative flex cursor-pointer select-none items-center rounded-sm py-2 px-3 text-sm outline-none hover:bg-accent data-[selected=true]:bg-accent"
                                       >
@@ -503,7 +514,26 @@ export function CreditForm({ initialData }: CreditFormProps) {
                   )} />
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                    <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Monto del Préstamo (C$)</FormLabel><FormControl><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">C$</span><Input type="number" placeholder="5000" {...field} className="pl-9" /></div></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="amount" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Monto del Préstamo (C$)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">C$</span>
+                            <Input
+                              type="number"
+                              placeholder="5000"
+                              {...field}
+                              className="pl-9"
+                              onBlur={() => {
+                                setTimeout(calculateInstallment, 100);
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
 
                     <FormField control={form.control} name="interestRate" render={({ field }) => (
                       <FormItem>
@@ -511,7 +541,15 @@ export function CreditForm({ initialData }: CreditFormProps) {
                         <FormControl>
                           <div className="relative">
                             <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input type="number" placeholder="Ej: 5" {...field} className="pl-9" />
+                            <Input
+                              type="number"
+                              placeholder="Ej: 5"
+                              {...field}
+                              className="pl-9"
+                              onBlur={() => {
+                                setTimeout(calculateInstallment, 100);
+                              }}
+                            />
                           </div>
                         </FormControl>
                         <FormMessage />
@@ -523,7 +561,13 @@ export function CreditForm({ initialData }: CreditFormProps) {
                     <FormField control={form.control} name="paymentFrequency" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Forma de Pago</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            setTimeout(calculateInstallment, 100);
+                          }}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecciona forma de pago" />
@@ -544,7 +588,15 @@ export function CreditForm({ initialData }: CreditFormProps) {
                       <FormItem>
                         <FormLabel>Plazo del Préstamo (Meses)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.5" placeholder="Ej: 24" {...field} />
+                          <Input
+                            type="number"
+                            step="0.5"
+                            placeholder="Ej: 24"
+                            {...field}
+                            onBlur={() => {
+                              setTimeout(calculateInstallment, 100);
+                            }}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -558,7 +610,10 @@ export function CreditForm({ initialData }: CreditFormProps) {
                         <FormControl>
                           <DateInput
                             value={field.value}
-                            onChange={field.onChange}
+                            onChange={(value) => {
+                              field.onChange(value);
+                              setTimeout(calculateInstallment, 100);
+                            }}
                             placeholder="Seleccionar fecha"
                             required
                           />
@@ -595,7 +650,20 @@ export function CreditForm({ initialData }: CreditFormProps) {
                     <FormField control={form.control} name="collectionsManager" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Gestor Asignado</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || undefined} disabled={isGestor}>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // Auto-assign supervisor when gestor is selected
+                            if (!isGestor && value && staff.length > 0) {
+                              const selectedGestor = staff.find(g => g.id === value);
+                              if (selectedGestor && selectedGestor.supervisorId) {
+                                setValue('supervisor', selectedGestor.supervisorId);
+                              }
+                            }
+                          }}
+                          value={field.value || undefined}
+                          disabled={isGestor}
+                        >
                           <FormControl><SelectTrigger><div className="flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground" /><SelectValue placeholder="Seleccionar gestor" /></div></SelectTrigger></FormControl>
                           <SelectContent>
                             {gestores.map(g => <SelectItem key={g.id} value={g.id!}>{g.fullName}</SelectItem>)}

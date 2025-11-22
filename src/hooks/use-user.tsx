@@ -16,17 +16,31 @@ const UserContext = React.createContext<UserContextType | null>(null);
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<AppUser | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [lastFetch, setLastFetch] = React.useState<number>(0);
   const router = useRouter();
 
   React.useEffect(() => {
+    let isMounted = true;
+
     async function getUserSession() {
       try {
-        const response = await fetch('/api/me');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+        
+        const response = await fetch('/api/me', {
+          signal: controller.signal,
+          cache: 'no-store' // Evitar caché del navegador para datos de sesión
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!isMounted) return; // Evitar actualizar estado si el componente se desmontó
         
         if (response.ok) {
           const userData: AppUser = await response.json();
           if (userData && userData.id) {
             setUser(userData);
+            setLastFetch(Date.now());
           } else {
             setUser(null);
           }
@@ -35,16 +49,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
         }
       } catch (error) {
-        console.error("Error fetching user session:", error);
+        if (!isMounted) return;
+        
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.warn("Timeout al obtener sesión de usuario");
+        } else {
+          console.error("Error fetching user session:", error);
+        }
         setUser(null);
       } finally {
-        // We set loading to false regardless of the outcome.
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
+    // Ejecutar inmediatamente al montar
     getUserSession();
-  }, []);
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Solo ejecutar una vez al montar
   
   const handleSetUser = (updatedUser: AppUser | null) => {
     setUser(updatedUser);

@@ -8,6 +8,7 @@ import { createLog } from './audit-log-service';
 import { revalidatePath } from 'next/cache';
 import { getCreditsAdmin, getCredit } from './credit-service-server';
 import { getPaidCreditsForGestor } from './portfolio-service';
+import { nowInNicaragua, isoToMySQLDateTime } from '@/lib/date-utils';
 
 export async function createClient(
   clientData: Omit<Client, 'id' | 'clientNumber' | 'createdAt'>,
@@ -29,13 +30,16 @@ export async function createClient(
         }
     }
 
+    // Obtener fecha actual en Nicaragua
+    const createdAtNicaragua = isoToMySQLDateTime(nowInNicaragua());
+
     const clientSql = `
-        INSERT INTO clients (id, clientNumber, name, firstName, lastName, cedula, phone, sex, civilStatus, employmentType, sucursal_id, sucursal_name, department, municipality, neighborhood, address, tags)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO clients (id, clientNumber, name, firstName, lastName, cedula, phone, sex, civilStatus, employmentType, sucursal_id, sucursal_name, department, municipality, neighborhood, address, tags, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await query(clientSql, [
-        newClientId, clientNumber, name, firstName, lastName, encodeData(cedula), phone, sex, civilStatus, employmentType, sucursal, finalSucursalName, department, municipality, neighborhood, address, JSON.stringify(tags || [])
+        newClientId, clientNumber, name, firstName, lastName, encodeData(cedula), phone, sex, civilStatus, employmentType, sucursal, finalSucursalName, department, municipality, neighborhood, address, JSON.stringify(tags || []), createdAtNicaragua, createdAtNicaragua
     ]);
 
     if (employmentType === 'asalariado' && asalariadoInfo) {
@@ -70,6 +74,23 @@ export async function updateClient(
     actor: User
 ): Promise<{ success: boolean; error?: string }> {
     try {
+        // Verificar permisos de edición
+        const actorRole = actor.role.toUpperCase();
+        if (!['ADMINISTRADOR', 'GERENTE', 'OPERATIVO'].includes(actorRole)) {
+            return { success: false, error: 'No tienes permisos para editar clientes.' };
+        }
+
+        // Si es GERENTE u OPERATIVO, verificar que el cliente pertenece a su sucursal
+        if (['GERENTE', 'OPERATIVO'].includes(actorRole)) {
+            const clientRows: any = await query('SELECT sucursal_id FROM clients WHERE id = ? LIMIT 1', [id]);
+            if (clientRows.length === 0) {
+                return { success: false, error: 'Cliente no encontrado.' };
+            }
+            
+            if (clientRows[0].sucursal_id !== actor.sucursal) {
+                return { success: false, error: 'No tienes permisos para editar este cliente.' };
+            }
+        }
         const { references, asalariadoInfo, comercianteInfo, tags, interactions, sucursal, sucursalName, ...clientFields } = clientData;
 
         // Build the dynamic UPDATE query for the main 'clients' table
@@ -129,6 +150,11 @@ export async function deleteClient(
     actor: User,
 ): Promise<{ success: boolean; error?: string }> {
     try {
+        // Solo ADMINISTRADOR puede eliminar clientes
+        if (actor.role.toUpperCase() !== 'ADMINISTRADOR') {
+            return { success: false, error: 'Solo los administradores pueden eliminar clientes.' };
+        }
+
         const credits: any = await query('SELECT id FROM credits WHERE clientId = ? LIMIT 1', [clientId]);
         if (credits.length > 0) {
             return { success: false, error: 'No se puede eliminar un cliente con créditos asociados.' };
@@ -176,7 +202,7 @@ export const getClient = async (id: string): Promise<Client | null> => {
         asalariadoInfo: asalariadoRows[0] || null,
         comercianteInfo: comercianteRows[0] || null,
         references: referenceRows,
-        interactions: interactionRows.map((row: any) => ({ ...row, date: new Date(row.date).toISOString() })),
+        interactions: interactionRows.map((row: any) => ({ ...row, date: toISOString(row.date) || nowInNicaragua() })),
     } as Client;
 };
 
@@ -215,12 +241,17 @@ export const getClients = async (options: { searchTerm?: string; user?: User, fo
                 } else {
                      whereClauses.push('1 = 0');
                 }
-        } else if (userRole === 'SUPERVISOR') {
+        } else if (userRole === 'SUPERVISOR' || userRole === 'GERENTE' || userRole === 'OPERATIVO') {
+            // SUPERVISOR, GERENTE y OPERATIVO solo ven clientes de su sucursal
             if (user.sucursal) {
                 whereClauses.push('c.sucursal_id = ?');
                 params.push(user.sucursal);
+            } else {
+                // Si no tienen sucursal asignada, no pueden ver ningún cliente
+                whereClauses.push('1 = 0');
             }
         }
+        // ADMINISTRADOR y FINANZAS pueden ver todos los clientes (sin filtro adicional)
     }
     
     if (whereClauses.length > 0) {
@@ -306,7 +337,8 @@ export async function addInteraction(
 ): Promise<{success: boolean, error?: string}> {
     try {
         const sql = 'INSERT INTO interactions (clientId, date, user, type, notes) VALUES (?, ?, ?, ?, ?)';
-        await query(sql, [clientId, new Date(interaction.date), interaction.user, interaction.type, interaction.notes]);
+        const interactionDate = isoToMySQLDateTime(interaction.date);
+        await query(sql, [clientId, interactionDate, interaction.user, interaction.type, interaction.notes]);
         
         revalidatePath(`/clients/${clientId}`);
         return { success: true };

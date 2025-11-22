@@ -112,7 +112,7 @@ export async function POST(request: Request) {
 
     // Generar recibo en formato texto (para impresoras térmicas)
     if (format === 'text') {
-      const receiptText = `${isReprint ? '*** REIMPRESION ***\n' : ''}CrediNica
+      const receiptText = `${isReprint ? '*** REIMPRESION ***\n' : ''}CrediNic
 COPIA: CLIENTE
 ------------------------------------------
 Recibo: ${paymentToPrint.transactionNumber}
@@ -199,7 +199,7 @@ GESTOR DE COBRO
 <body>
     <div class="receipt-container">
         ${isReprint ? '<div class="center bold">*** REIMPRESION ***</div>' : ''}
-        <div class="center bold">CrediNica</div>
+        <div class="center bold">CrediNic</div>
         <div class="center">COPIA: CLIENTE</div>
         <div class="line"></div>
         <div>Recibo: ${sanitize(paymentToPrint.transactionNumber)}</div>

@@ -14,7 +14,7 @@ export function LoginFooter() {
 
     return (
         <footer className="w-full text-center text-sm text-muted-foreground">
-            © {year || new Date().getFullYear()} CrediNica. Todos los derechos reservados.
+            © {year || new Date().getFullYear()} CrediNic. Todos los derechos reservados.
         </footer>
     );
 }

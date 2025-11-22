@@ -12,6 +12,7 @@ import { es } from 'date-fns/locale';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { getUserByName } from '@/services/user-service-server';
+import { toNicaraguaTime, nowInNicaragua } from '@/lib/date-utils';
 
 interface DocumentOutput {
     pdfDataUri?: string;
@@ -181,7 +182,9 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
             size: 11 
         });
 
-        y = headerY - logoDims.height - 30; // Increased space from 15 to 30
+        // Ajustar Y basado en si hay logo o no
+        const logoHeightUsed = logoDims ? logoDims.height : 35; // 35 es la altura del logo alternativo
+        y = headerY - logoHeightUsed - 30; // Increased space from 15 to 30
         // --- End Header Section ---
 
 
@@ -252,13 +255,13 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
 
         const totalAmountInWords = numeroALetras(totalAmount).toUpperCase();
         const numberOfInstallments = getNumberOfInstallments(creditData.termMonths, creditData.paymentFrequency);
-        const documentDate = creditData.deliveryDate && isValid(parseISO(creditData.deliveryDate)) ? parseISO(creditData.deliveryDate) : new Date();
+        const documentDate = creditData.deliveryDate && isValid(parseISO(creditData.deliveryDate)) ? parseISO(creditData.deliveryDate) : toNicaraguaTime(nowInNicaragua());
 
         const paragraphs = [
             `YO, **${clientName}**, mayor de edad, debidamente identificado con cédula de identidad número **${clientId}** y del domicilio de **${clientAddress || '____________________'}**, en lo sucesivo denominado únicamente como EL DEUDOR.`,
-            `Por este PAGARÉ A LA ORDEN pagaré AL SEÑOR **ULBERT ALEJANDRO MARTINEZ LOPEZ**, con cédula de identidad número **001-010179-0012K**, conocido comercialmente como: **CREDINICA** y que en lo sucesivo denominaré como EL ACREEDOR o a su orden en sus oficinas situadas en la ciudad de León, con dirección Villa Casteleon boulevard 1c al este 1c al norte, la cantidad de **C$ ${totalAmount.toLocaleString('es-NI', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${totalAmountInWords})** que confieso haber recibido a entera satisfacción.`,
-            `La forma de pago, será mediante la amortización de pago de **${numberOfInstallments} cuotas** en frecuencias de pagos **${creditData.paymentFrequency.toUpperCase()}**, las cuales comprenden el principal e intereses pactados. Las fechas y montos de pago de cada cuota de amortización se estipularan en el Plan de pago que AL SEÑOR: **ULBERT ALEJANDRO MARTINEZ/CREDINICA** me ha hecho de mi conocimiento. Para los efectos del presente pagaré a la orden renuncio al domicilio sin costo legal de la República de Nicaragua, sujeto a jurisdicción y tribunales de la ciudad de León. Hago constar que la firma expuesta en el presente pagaré es la que utilizo en todos y para todos los fines de ley.`,
-            `El plazo del presente pagaré a la orden se dará como finalizado anticipadamente sin excepción, a elección DEL SEÑOR: **ULBERT ALEJANDRO MARTINEZ/CREDINICA**, si se entablare por otra persona acción judicial en mi contra o de mis fiadores o también si incumpliere con el pago de dos de las cuotas de pago arriba señaladas, o bien si dejase de cumplir con cualquier otra obligación contraída con EL SEÑOR: **ULBERT ALEJANDRO MARTINEZ/CREDINICA**. En caso de que faltare el pago de una sola de las cuotas en la fecha señalada o el solo hecho del incumplimiento sin necesidad de requerimiento judicial, quedando en libertad EL ACREEDOR de solicitarme de forma completa e inmediata el pago por medio de la correspondiente ejecución. En virtud de lo anterior, me someto a los juzgados civiles del departamento de León y acepto los gastos de cobranza judicial y extrajudicial, así como también los intereses legales de ser necesario.`,
+            `Por este PAGARÉ A LA ORDEN pagaré AL SEÑOR **ULBERT ALEJANDRO MARTINEZ LOPEZ**, con cédula de identidad número **001-010179-0012K**, conocido comercialmente como: **CREDINIC** y que en lo sucesivo denominaré como EL ACREEDOR o a su orden en sus oficinas situadas en la ciudad de León, con dirección Villa Casteleon boulevard 1c al este 1c al norte, la cantidad de **C$ ${totalAmount.toLocaleString('es-NI', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${totalAmountInWords})** que confieso haber recibido a entera satisfacción.`,
+            `La forma de pago, será mediante la amortización de pago de **${numberOfInstallments} cuotas** en frecuencias de pagos **${creditData.paymentFrequency.toUpperCase()}**, las cuales comprenden el principal e intereses pactados. Las fechas y montos de pago de cada cuota de amortización se estipularan en el Plan de pago que AL SEÑOR: **ULBERT ALEJANDRO MARTINEZ/CREDINIC** me ha hecho de mi conocimiento. Para los efectos del presente pagaré a la orden renuncio al domicilio sin costo legal de la República de Nicaragua, sujeto a jurisdicción y tribunales de la ciudad de León. Hago constar que la firma expuesta en el presente pagaré es la que utilizo en todos y para todos los fines de ley.`,
+            `El plazo del presente pagaré a la orden se dará como finalizado anticipadamente sin excepción, a elección DEL SEÑOR: **ULBERT ALEJANDRO MARTINEZ/CREDINIC**, si se entablare por otra persona acción judicial en mi contra o de mis fiadores o también si incumpliere con el pago de dos de las cuotas de pago arriba señaladas, o bien si dejase de cumplir con cualquier otra obligación contraída con EL SEÑOR: **ULBERT ALEJANDRO MARTINEZ/CREDINIC**. En caso de que faltare el pago de una sola de las cuotas en la fecha señalada o el solo hecho del incumplimiento sin necesidad de requerimiento judicial, quedando en libertad EL ACREEDOR de solicitarme de forma completa e inmediata el pago por medio de la correspondiente ejecución. En virtud de lo anterior, me someto a los juzgados civiles del departamento de León y acepto los gastos de cobranza judicial y extrajudicial, así como también los intereses legales de ser necesario.`,
             `Para los efectos legales renuncio al fuero tributo y de la fuerza mayor, cuyos riesgos acepto, por imprevistos o inesperados que estos sean, o de igual forma, autorizo AL ACREEDOR en caso de incumplimiento parcial o total del presente pagaré a retirar los bienes puestos en garantía, de los cuales soy custodio, y autorizo al ACREEDOR a que se adjudique dichos bienes en activo que yo sea representado por el mismo y a favor de él en caso de ejecución por el incumplimiento y lo acepto en todo el sentido.`
         ];
         
@@ -297,7 +300,7 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
             y2 -= 40;
             
             const fiadorParagraphs = [
-                `Yo, **${fiador.name.toUpperCase()}**, mayor de edad, identificado con cédula de identidad número **${formatCedulaForPagare(fiador.cedula)}** del domicilio de **${fiador.address.toUpperCase()}** en mi propio e interés me constituyo como DEUDOR SOLIDARIO Y FIADOR de **${(client?.name || '').toUpperCase()}**, para con EL ACREEDOR: **ULBERT ALEJANDRO MARTÍNEZ LÓPEZ**, conocido como **CREDINICA**, a fin de garantizar el pago total y extensivo de la cantidad de **C$ ${totalAmount.toLocaleString('es-NI', {minimumFractionDigits: 2, maximumFractionDigits: 2})}** estipulado en el pagaré a la orden que antecede. Acepto hacer propia dicha obligación.`,
+                `Yo, **${fiador.name.toUpperCase()}**, mayor de edad, identificado con cédula de identidad número **${formatCedulaForPagare(fiador.cedula)}** del domicilio de **${fiador.address.toUpperCase()}** en mi propio e interés me constituyo como DEUDOR SOLIDARIO Y FIADOR de **${(client?.name || '').toUpperCase()}**, para con EL ACREEDOR: **ULBERT ALEJANDRO MARTÍNEZ LÓPEZ**, conocido como **CREDINIC**, a fin de garantizar el pago total y extensivo de la cantidad de **C$ ${totalAmount.toLocaleString('es-NI', {minimumFractionDigits: 2, maximumFractionDigits: 2})}** estipulado en el pagaré a la orden que antecede. Acepto hacer propia dicha obligación.`,
                 `En fe de lo anterior firmo en la ciudad de **${(client?.municipality || 'León').toUpperCase()}**, el día **${format(documentDate, "dd 'de' MMMM 'del' yyyy", { locale: es })}**.`
             ];
             

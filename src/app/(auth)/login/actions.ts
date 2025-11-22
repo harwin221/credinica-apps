@@ -68,7 +68,8 @@ export async function loginUser(credentials: {email: string; password: string;})
         role: user.role,
         fullName: user.fullName,
         email: user.email,
-        mustChangePassword: user.mustChangePassword
+        mustChangePassword: user.mustChangePassword,
+        supervisorId: user.supervisorId
     };
 
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
@@ -96,23 +97,54 @@ export async function getSession(): Promise<AppUser | null> {
   const decryptedSession = await decrypt(sessionCookie);
   if (!decryptedSession?.userId) return null;
 
-  // Obtener el perfil de usuario completo y actualizado de la base de datos
-  const userProfile = await getUserProfileFromDatabase(decryptedSession.userId);
-  return userProfile;
+  try {
+    // Obtener el perfil de usuario completo y actualizado de la base de datos
+    const userProfile = await getUserProfileFromDatabase(decryptedSession.userId);
+    return userProfile;
+  } catch (error) {
+    console.error('Error obteniendo perfil de usuario:', error);
+    // En caso de error de DB, devolver datos básicos del token
+    return {
+      id: decryptedSession.userId,
+      fullName: decryptedSession.fullName || 'Usuario',
+      email: decryptedSession.email || '',
+      role: decryptedSession.role || 'OPERATIVO',
+      mustChangePassword: decryptedSession.mustChangePassword || false,
+      supervisorId: decryptedSession.supervisorId,
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    } as AppUser;
+  }
 }
 
 /**
  * Obtiene el perfil de usuario completo de la base de datos.
- * Esto debería usarse para obtener los datos de usuario más actuales, especialmente después de actualizaciones.
+ * Optimizado para obtener solo los campos necesarios y ser más rápido.
  * @param userId El ID del usuario a obtener.
  * @returns El objeto AppUser completo o null si no se encuentra.
  */
 async function getUserProfileFromDatabase(userId: string): Promise<AppUser | null> {
-    const rows: any = await query('SELECT * FROM users WHERE id = ?', [userId]);
+    // Consulta optimizada: solo seleccionar campos necesarios, sin hashed_password
+    const sql = `
+        SELECT id, fullName, email, phone, role, sucursal_id, sucursal_name, 
+               active, mustChangePassword, supervisor_id, supervisor_name, 
+               createdAt, updatedAt 
+        FROM users 
+        WHERE id = ? AND active = 1 
+        LIMIT 1
+    `;
+    
+    const rows: any = await query(sql, [userId]);
     if(rows.length > 0) {
-        // Excluir la contraseña hasheada del objeto devuelto a la sesión del cliente
-        const { hashed_password, ...user } = rows[0];
-        return user as AppUser;
+        const user = rows[0];
+        return {
+            ...user,
+            sucursal: user.sucursal_id,
+            sucursalName: user.sucursal_name,
+            supervisorId: user.supervisor_id,
+            supervisorName: user.supervisor_name
+        } as AppUser;
     }
     return null;
 }

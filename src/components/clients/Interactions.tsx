@@ -11,6 +11,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlusCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { nowInNicaragua } from '@/lib/date-utils';
 
 interface InteractionsProps {
   client: Client;
@@ -28,7 +29,7 @@ export function Interactions({ client, onInteractionAdd }: InteractionsProps) {
     setIsAdding(true);
     
     const interaction: Omit<ClientInteraction, 'id'> = {
-      date: new Date().toISOString(),
+      date: nowInNicaragua(),
       user: user.fullName,
       type: newInteractionType,
       notes: newInteractionNotes,

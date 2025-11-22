@@ -12,7 +12,7 @@ const fontInter = Inter({
   variable: '--font-inter',
 });
 
-const APP_NAME = "CrediNica";
+const APP_NAME = "CrediNic";
 const APP_DESCRIPTION = "Gestión de Créditos y Cobranza";
 
 export const metadata: Metadata = {
@@ -35,17 +35,25 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/CrediNica-inicial.png", sizes: "192x192", type: "image/png" },
-      { url: "/CrediNica.png", sizes: "512x512", type: "image/png" }
+      { url: "/CrediNica-inicial.png", sizes: "512x512", type: "image/png" }
     ],
+    shortcut: "/CrediNica-inicial.png",
     apple: [
       { url: "/CrediNica-inicial.png", sizes: "180x180", type: "image/png" }
-    ]
+    ],
   },
-  keywords: ["créditos", "cobranza", "microfinanzas", "nicaragua", "gestión financiera"],
-  authors: [{ name: "CrediNica Team" }],
-  creator: "CrediNica",
-  publisher: "CrediNica",
+  keywords: ["créditos", "cobranza", "microfinanzas", "nicaragua", "gestión financiera", "pwa", "app"],
+  authors: [{ name: "CrediNic Team" }],
+  creator: "CrediNic",
+  publisher: "CrediNic",
   robots: "noindex, nofollow", // Para producción cambiar a "index, follow"
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
+    "msapplication-TileColor": "#1f2937",
+    "msapplication-config": "none"
+  }
 };
 
 export const viewport: Viewport = {

@@ -6,13 +6,14 @@ import type { Holiday, User } from '@/lib/types';
 import { format } from 'date-fns';
 import { createLog } from './audit-log-service';
 import { revalidatePath } from 'next/cache';
+import { formatDateForUser } from '@/lib/date-utils';
 
 export const getHolidays = async (): Promise<Holiday[]> => {
     const rows: any = await query('SELECT * FROM holidays ORDER BY date ASC');
     // Asegurarse de que la fecha se devuelve en formato 'YYYY-MM-DD' para consistencia
     return rows.map((row: any) => ({
         ...row,
-        date: format(new Date(row.date), 'yyyy-MM-dd')
+        date: formatDateForUser(row.date, 'yyyy-MM-dd')
     }));
 };
 

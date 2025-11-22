@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Building, CalendarOff, Settings as SettingsIcon, Loader2, RefreshCw } from 'lucide-react';
+import { Users, Building, CalendarOff, Settings as SettingsIcon, Loader2, RefreshCw, ArrowLeft } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
 import { useUser } from '@/hooks/use-user';
 import { AccessDenied } from '@/components/AccessDenied';
@@ -20,34 +20,34 @@ export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSyncing, setIsSyncing] = React.useState(false);
-  
+
   if (!user) return null; // Or a loading skeleton
   if (!ALLOWED_ROLES.includes(user.role)) {
     return <AccessDenied />;
   }
-  
+
   const handleSync = async () => {
-      setIsSyncing(true);
-      toast({ title: "Iniciando Sincronización...", description: "Regenerando planes de pago para créditos activos. Esto puede tardar un momento." });
-      try {
-        const result = await revalidateActiveCreditsStatus();
-        if(result.success) {
-            toast({
-                title: "Sincronización Completada",
-                description: `Se han regenerado ${result.updatedCount} planes de pago.`,
-            });
-        } else {
-            throw new Error(result.error);
-        }
-      } catch (error) {
+    setIsSyncing(true);
+    toast({ title: "Iniciando Sincronización...", description: "Regenerando planes de pago para créditos activos. Esto puede tardar un momento." });
+    try {
+      const result = await revalidateActiveCreditsStatus();
+      if (result.success) {
         toast({
-            title: "Error de Sincronización",
-            description: error instanceof Error ? error.message : "No se pudo completar la operación.",
-            variant: "destructive",
+          title: "Sincronización Completada",
+          description: `Se han regenerado ${result.updatedCount} planes de pago.`,
         });
-      } finally {
-        setIsSyncing(false);
+      } else {
+        throw new Error(result.error);
       }
+    } catch (error) {
+      toast({
+        title: "Error de Sincronización",
+        description: error instanceof Error ? error.message : "No se pudo completar la operación.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const settings = [
@@ -78,7 +78,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {settings.map((setting) => (
-          <ReportCard 
+          <ReportCard
             key={setting.title}
             title={setting.title}
             category={setting.category}
@@ -86,9 +86,9 @@ export default function SettingsPage() {
             onClick={() => router.push(setting.href)}
           />
         ))}
-         <Card className="border-blue-500/50 hover:shadow-lg hover:border-blue-500 transition-all">
+        <Card className="border-blue-500/50 hover:shadow-lg hover:border-blue-500 transition-all">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold flex items-center gap-2"><RefreshCw className="h-5 w-5 text-blue-600"/>Sincronizar Planes de Pago</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2"><RefreshCw className="h-5 w-5 text-blue-600" />Sincronizar Planes de Pago</CardTitle>
             <CardDescription className="text-xs">
               Vuelve a calcular todos los planes de pago de los créditos activos. Úsalo después de añadir feriados para corregir fechas.
             </CardDescription>
@@ -106,4 +106,3 @@ export default function SettingsPage() {
   );
 }
 
-    

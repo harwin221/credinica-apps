@@ -45,7 +45,7 @@ export default function AuditLogPage() {
         if (!canView) return;
         setIsLoading(true);
         try {
-            const logData: any = await clientQuery("SELECT * FROM audit_logs WHERE action LIKE '%delete%' ORDER BY timestamp DESC");
+            const logData: any = await clientQuery("SELECT * FROM audit_logs ORDER BY timestamp DESC");
             
             setLogs(logData.map((log: any) => ({
                 ...log,
@@ -136,7 +136,7 @@ export default function AuditLogPage() {
                                             <TableCell className="font-medium">{log.userName}</TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
-                                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                                    <History className="h-4 w-4 text-gray-500" />
                                                     <span className="font-mono text-xs">{log.action}</span>
                                                 </div>
                                             </TableCell>
@@ -146,7 +146,7 @@ export default function AuditLogPage() {
                                 ) : (
                                     <TableRow>
                                         <TableCell colSpan={4} className="h-24 text-center">
-                                            No se encontraron registros de eliminación.
+                                            No se encontraron registros de auditoría.
                                         </TableCell>
                                     </TableRow>
                                 )}

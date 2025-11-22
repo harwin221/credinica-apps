@@ -75,9 +75,13 @@ export const useDateInput = (options: UseDateInputOptions = {}) => {
   
   // Función para limpiar el valor
   const clear = useCallback(() => {
-    setDisplayValue('');
-    setError(null);
-  }, []);
+    if (displayValue !== '') {
+      setDisplayValue('');
+    }
+    if (error !== null) {
+      setError(null);
+    }
+  }, [displayValue, error]);
   
   // Función para establecer un valor específico desde ISO
   const setFromISO = useCallback((isoString: string | null) => {

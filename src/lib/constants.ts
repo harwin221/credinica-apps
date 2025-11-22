@@ -222,15 +222,15 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     'approval:view', 'disbursement:view'
   ],
   GERENTE: [
-    'dashboard:view', 'client:view', 'client:create', 'client:edit', 'client:delete',
-    'credit:view:all', 'credit:create', 'credit:edit', 'credit:delete', 'credit:pay', 'payment:void_request', 'void:approve',
+    'dashboard:view', 'client:view', 'client:create', 'client:edit',
+    'credit:view:all', 'credit:create', 'credit:edit', 'credit:pay', 'payment:void_request', 'void:approve',
     'closure:view', 'closure:create',
     'calculator:use', 'reports:view', 'reports:view:saldos', 'reports:view:operativos', 'reports:view:financieros',
     'audit:view', 'approval:view', 'approval:level2',
     'disbursement:view'
   ],
   SUPERVISOR: [
-    'dashboard:view', 'client:view', 'credit:view:all', 'credit:edit', 'credit:pay', 'payment:void_request',
+    'dashboard:view', 'client:view', 'credit:view:all', 'credit:create', 'credit:pay', 'payment:void_request',
     'calculator:use', 'reports:view', 'reports:view:saldos', 'reports:view:operativos', 
     'approval:view', 'disbursement:view'
   ],

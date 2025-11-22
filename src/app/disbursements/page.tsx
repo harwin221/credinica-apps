@@ -18,11 +18,11 @@ import { RejectionDialog } from '@/components/RejectionDialog';
 import { DisbursementForm, DisbursementFormValues } from './components/DisbursementForm';
 import { DisbursementDetailSheet } from './components/DisbursementDetailSheet';
 import { Button } from '@/components/ui/button';
-import { getCreditsAdmin } from '@/services/credit-service-server';
+import { addPayment, getCredit, getCreditsAdmin } from '@/services/credit-service-server';
 
 const ALLOWED_ROLES: UserRole[] = ['ADMINISTRADOR', 'GERENTE', 'SUPERVISOR', 'OPERATIVO'];
 
-const formatCurrency = (amount: number = 0) => `C$${amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatCurrency = (amount: number | null | undefined) => `C$${(amount || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 interface CreditLists {
   pending: CreditDetail[];
@@ -109,15 +109,21 @@ export default function DisbursementsPage() {
       const clientIdsWithPending = [...new Set(approvedCredits.map(c => c.clientId))];
       const relevantActiveCredits = activeCredits.filter(ac => clientIdsWithPending.includes(ac.clientId));
 
-      const enhancedPending = approvedCredits.map(credit => {
+      const enhancedPendingPromises = approvedCredits.map(async (credit) => {
         let outstandingBalance = 0;
         const activeCreditForClient = relevantActiveCredits.find(ac => ac.clientId === credit.clientId);
         if (activeCreditForClient) {
-          outstandingBalance = calculateCreditStatusDetails(activeCreditForClient).remainingBalance;
+          // Fetch full credit details to get registeredPayments
+          const fullActiveCredit = await getCredit(activeCreditForClient.id);
+          if (fullActiveCredit) {
+            outstandingBalance = calculateCreditStatusDetails(fullActiveCredit).remainingBalance;
+          }
         }
         const netDisbursementAmount = credit.amount - outstandingBalance;
-        return { ...credit, outstandingBalance, netDisbursementAmount: netDisbursementAmount > 0 ? netDisbursementAmount : 0 };
-      }).sort((a, b) => {
+        return { ...credit, outstandingBalance, netDisbursementAmount: netDisbursementAmount > 0 ? netDisbursementAmount : 0, activeCreditId: activeCreditForClient?.id };
+      });
+
+      const enhancedPending = (await Promise.all(enhancedPendingPromises)).sort((a, b) => {
         if (!a.approvalDate || !b.approvalDate) return 0;
         try {
           const dateA = typeof a.approvalDate === 'string' ? parseISO(a.approvalDate) : new Date(a.approvalDate);
@@ -189,13 +195,26 @@ export default function DisbursementsPage() {
         return;
       }
 
-      if (selectedCredit.outstandingBalance && selectedCredit.outstandingBalance > 0) {
-        // Lógica para manejar saldo pendiente si es necesario
+      // Si es un représtamo (hay saldo pendiente), liquidar el crédito anterior.
+      if (selectedCredit.outstandingBalance && selectedCredit.outstandingBalance > 0 && (selectedCredit as any).activeCreditId) {
+        const oldCreditId = (selectedCredit as any).activeCreditId;
+        
+        // 1. Registrar el pago de cancelación en el crédito antiguo.
+        const payoffPaymentData = {
+            paymentDate: nowInNicaragua(),
+            amount: selectedCredit.outstandingBalance,
+            managedBy: user.fullName, // El usuario que hace el desembolso
+            transactionNumber: `REFIN-${selectedCredit.creditNumber}`,
+            status: 'VALIDO' as const
+        };
+        await addPayment(oldCreditId, payoffPaymentData, user);
+        // La función addPayment se encarga de cambiar el estado a 'Paid' si el saldo es 0.
       }
 
+      // 2. Activar el nuevo crédito (lógica existente)
       await updateCreditAction(selectedCredit.id, {
         status: 'Active',
-        disbursedAmount: data.amount,
+        disbursedAmount: selectedCredit.amount, // FIX: Usar el monto total aprobado, no el neto.
         firstPaymentDate: firstPaymentDateISO,
         deliveryDate: nowInNicaragua(), // Fecha automática del desembolso
         disbursedBy: user.fullName,

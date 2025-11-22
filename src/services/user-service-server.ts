@@ -159,8 +159,24 @@ export async function resetUserPassword(uid: string): Promise<{success: boolean,
   }
 }
 
-export const getUsers = async (): Promise<AppUser[]> => {
-  const users: any = await query('SELECT u.id, u.fullName, u.email, u.phone, u.role, u.sucursal_id, u.sucursal_name, u.active, u.supervisor_id, u.supervisor_name FROM users u ORDER BY u.fullName');
+export const getUsers = async (currentUser?: AppUser): Promise<AppUser[]> => {
+  let sql = 'SELECT u.id, u.fullName, u.email, u.phone, u.role, u.sucursal_id, u.sucursal_name, u.active, u.supervisor_id, u.supervisor_name FROM users u';
+  const params: any[] = [];
+
+  // Aplicar filtros por rol del usuario actual
+  if (currentUser) {
+    const userRole = currentUser.role.toUpperCase();
+    if (['GERENTE', 'SUPERVISOR', 'OPERATIVO'].includes(userRole) && currentUser.sucursal) {
+      // Estos roles solo ven usuarios de su sucursal
+      sql += ' WHERE u.sucursal_id = ?';
+      params.push(currentUser.sucursal);
+    }
+    // ADMINISTRADOR y FINANZAS pueden ver todos los usuarios (sin filtro adicional)
+  }
+
+  sql += ' ORDER BY u.fullName';
+
+  const users: any = await query(sql, params);
   return users.map((u: any) => ({
       ...u,
       sucursal: u.sucursal_id,

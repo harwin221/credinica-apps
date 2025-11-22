@@ -5,7 +5,7 @@ import { query } from '@/lib/mysql';
 import type { CreditDetail, PortfolioCredit, User, Client, RegisteredPayment } from '@/lib/types';
 import { calculateCreditStatusDetails, type CreditStatusDetails } from '@/lib/utils';
 import { isToday, parseISO, differenceInDays, subDays, startOfDay, endOfDay } from 'date-fns';
-import { toNicaraguaTime } from '@/lib/date-utils';
+import { toNicaraguaTime, nowInNicaragua } from '@/lib/date-utils';
 import { getCreditsAdmin as getCreditsAdminServerSide } from './credit-service-server';
 import { getUser as getUserServerSide } from './user-service-server';
 import { generateDailyActivityReport } from './closure-service';
@@ -71,7 +71,7 @@ export async function getPortfolioForGestor(gestorId: string): Promise<{
         paymentPlansByCreditId.get(plan.creditId)!.push(plan);
     }
     
-    const asOfDate = toNicaraguaTime(new Date().toISOString());
+    const asOfDate = toNicaraguaTime(nowInNicaragua());
 
     // 4. Procesar cada crédito usando los datos ya obtenidos en memoria.
     const portfolioCredits = activeCredits.map(credit => {
@@ -138,7 +138,7 @@ export async function getGestorDashboardData(gestor: User, activeCredits: Credit
     let metaDeCobro = 0;
     const clientsPaidToday = new Set<string>();
 
-    const asOfDate = toNicaraguaTime(new Date().toISOString());
+    const asOfDate = toNicaraguaTime(nowInNicaragua());
 
     if (activeCredits.length > 0) {
         const creditIds = activeCredits.map(c => c.id);
@@ -201,7 +201,7 @@ export async function getGestorDashboardData(gestor: User, activeCredits: Credit
 }
 
 export async function getPaidCreditsForGestor(gestorName: string, daysAgo: number): Promise<CreditDetail[]> {
-    const today = endOfDay(new Date());
+    const today = endOfDay(toNicaraguaTime(nowInNicaragua()));
     const dateLimit = startOfDay(subDays(today, daysAgo));
     
     // 1. Encontrar los últimos pagos de cada crédito para determinar la fecha de cancelación
@@ -210,7 +210,7 @@ export async function getPaidCreditsForGestor(gestorName: string, daysAgo: numbe
         FROM payments_registered
         WHERE status != 'ANULADO'
         GROUP BY creditId
-        HAVING cancellationDate <= ?
+        HAVING cancellationDate >= ?
     `;
 
     const lastPayments = await query(lastPaymentsSql, [dateLimit]) as { creditId: string, cancellationDate: Date }[];

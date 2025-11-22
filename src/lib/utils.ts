@@ -5,7 +5,7 @@ import { addWeeks, addDays, parseISO, startOfDay, isBefore, differenceInDays, fo
 import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 import { TIMEZONE } from './constants';
-import { formatDateForUser, formatDateTimeForUser, toISOString } from './date-utils';
+import { formatDateForUser, formatDateTimeForUser, toISOString, todayInNicaragua, nowInNicaragua, toNicaraguaTime } from './date-utils';
 
 
 export function cn(...inputs: ClassValue[]) {
@@ -78,7 +78,7 @@ export const normalizeString = (str: string = ''): string => {
  * @returns El objeto Date ajustado.
  */
 export const adjustToNextBusinessDay = (date: Date, frequency: PaymentFrequency, holidays: string[] = []): Date => {
-    let newDate = new Date(date);
+    let newDate = new Date(date.getTime());
 
     const isHoliday = (d: Date) => {
         const dateString = format(d, 'yyyy-MM-dd');
@@ -86,37 +86,51 @@ export const adjustToNextBusinessDay = (date: Date, frequency: PaymentFrequency,
     };
 
     let adjusted = true;
-    while(adjusted) {
+    let iterations = 0;
+    const MAX_ITERATIONS = 30; // Prevenir bucles infinitos
+    
+    while(adjusted && iterations < MAX_ITERATIONS) {
         adjusted = false;
+        iterations++;
         const dayOfWeek = newDate.getDay(); // 0 = Domingo, 6 = Sábado
 
-        // Regla para Domingo (aplica a todos)
-        if (dayOfWeek === 0) {
+        // PASO 1: Verificar si es feriado (primero, antes de verificar día de semana)
+        if (isHoliday(newDate)) {
             newDate = addDays(newDate, 1);
+            adjusted = true;
+            continue; // Volver a verificar la nueva fecha
+        }
+
+        // PASO 2: Verificar Domingo (aplica a TODOS los tipos de crédito)
+        if (dayOfWeek === 0) {
+            newDate = addDays(newDate, 1); // Mover a lunes
             adjusted = true;
             continue;
         }
 
-        // Regla para Sábado
+        // PASO 3: Verificar Sábado (reglas específicas por tipo de crédito)
         if (dayOfWeek === 6) {
-            if (frequency === 'Diario') { // Para diarios, saltar sábado a lunes
+            if (frequency === 'Diario') {
+                // Diarios: Saltar sábado y domingo, ir a lunes
+                newDate = addDays(newDate, 2);
+                adjusted = true;
+                continue;
+            } else if (frequency === 'Semanal' || frequency === 'Catorcenal') {
+                // Semanal y Catorcenal: Mover a lunes
                 newDate = addDays(newDate, 2);
                 adjusted = true;
                 continue;
             }
-            // Para otros, el sábado es un día de cobro válido si se movió de un feriado.
-            // Si la fecha original cae en sábado, Quincenal se queda, otros se mueven.
-            if (frequency === 'Semanal' || frequency === 'Catorcenal') {
-                 // Si el día pactado es sábado (poco probable pero posible), lo dejamos,
-                 // si se movió a un sábado, está bien. La lógica principal se encarga.
-            }
+            // Quincenal: Se queda en sábado (no hace nada, es válido)
         }
-        
-        // Regla para Feriados (aplica a todos, después de ajustar fines de semana)
-        if (isHoliday(newDate)) {
-            newDate = addDays(newDate, 1);
-            adjusted = true;
-        }
+    }
+    
+    if (iterations >= MAX_ITERATIONS) {
+        console.error('adjustToNextBusinessDay: Se alcanzó el máximo de iteraciones', {
+            originalDate: format(date, 'yyyy-MM-dd'),
+            frequency,
+            holidays: holidays.length
+        });
     }
     
     return newDate;
@@ -141,9 +155,8 @@ export function generatePaymentSchedule(data: PaymentScheduleArgs): CalculatedPa
       // Si ya es ISO, parsearlo directamente
       initialDate = parseISO(dateInput);
     } else {
-      // Si es solo fecha (YYYY-MM-DD), crear fecha local de Nicaragua
-      const nicaraguaDate = new Date(`${dateInput}T00:00:00`);
-      initialDate = nicaraguaDate;
+      // Si es solo fecha (YYYY-MM-DD), parsear correctamente
+      initialDate = parseISO(`${dateInput}T00:00:00`);
     }
     
     if (isNaN(initialDate.getTime())) return null;
@@ -425,7 +438,16 @@ export function calculateCreditStatusDetails(credit: CreditDetail, asOfDateStr?:
     }
     
     // Continuar para créditos Activos
-    const asOfDate = asOfDateStr ? startOfDay(new Date(asOfDateStr)) : startOfDay(new Date());
+    let asOfDate: Date;
+    if (asOfDateStr) {
+        if (typeof asOfDateStr === 'string') {
+            asOfDate = startOfDay(parseISO(asOfDateStr));
+        } else {
+            asOfDate = startOfDay(asOfDateStr);
+        }
+    } else {
+        asOfDate = startOfDay(parseISO(nowInNicaragua()));
+    }
 
     const totalToPay = credit.totalAmount || 0;
     const validPayments = registeredPayments.filter(p => p.status !== 'ANULADO');
@@ -442,47 +464,42 @@ export function calculateCreditStatusDetails(credit: CreditDetail, asOfDateStr?:
         return defaultReturn;
     }
 
+    // --- LÓGICA DE FECHAS REFACTORIZADA PARA EVITAR ERRORES DE ZONA HORARIA ---
+    const asOfDateString = asOfDateStr ? formatDateForUser(asOfDateStr, 'yyyy-MM-dd') : todayInNicaragua();
+
     const paidToday = validPayments
         .filter(p => {
-             const safeDateString = toISOStringSafe(p.paymentDate);
-             return safeDateString && isEqual(startOfDay(new Date(safeDateString)), asOfDate);
+             const paymentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
+             return paymentDateString === asOfDateString;
         })
         .reduce((sum, p) => sum + p.amount, 0);
-
 
     const lastPayment = sortedValidPayments[0];
     const safeDueDate = toISOStringSafe(credit.dueDate);
     const isExpired = safeDueDate ? isBefore(parseISO(safeDueDate), asOfDate) : false;
 
-    // Encontrar la cuota para "hoy" (asOfDate)
-    // Calcular lo que se debía *antes* de hoy
     const installmentsDueBeforeToday = paymentPlan
       .filter(p => {
-          const safePDate = toISOStringSafe(p.paymentDate);
-          return safePDate && isBefore(startOfDay(parseISO(safePDate)), asOfDate);
+          const installmentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
+          return installmentDateString && installmentDateString < asOfDateString;
       });
 
     const amountDueBeforeToday = installmentsDueBeforeToday.reduce((sum, p) => sum + p.amount, 0);
 
     const totalPaidBeforeToday = validPayments
       .filter(p => {
-          const safeDateString = toISOStringSafe(p.paymentDate);
-          return safeDateString && isBefore(new Date(safeDateString), asOfDate);
+          const paymentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
+          return paymentDateString && paymentDateString < asOfDateString;
       })
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // El excedente de pagos anteriores se calcula aquí
     const surplusFromPast = Math.max(0, totalPaidBeforeToday - amountDueBeforeToday);
     
-    // El monto en mora es la deuda de cuotas pasadas menos el total pagado en el pasado.
     let overdueAmount = Math.max(0, amountDueBeforeToday - totalPaidBeforeToday);
 
-    // Encontrar la cuota para "hoy" (asOfDate)
     const installmentDueToday = paymentPlan.find(p => {
-        const safePDate = toISOStringSafe(p.paymentDate);
-        if (!safePDate) return false;
-        const installmentDate = startOfDay(parseISO(safePDate));
-        return isEqual(installmentDate, asOfDate);
+        const installmentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
+        return installmentDateString === asOfDateString;
     });
     const isDueToday = !!installmentDueToday;
     const originalDueTodayAmount = isDueToday ? (installmentDueToday?.amount || 0) : 0;
@@ -560,7 +577,7 @@ export interface FullStatement {
  */
 export function generateFullStatement(credit: CreditDetail): FullStatement {
   const LATE_FEE_RATE_PER_DAY = 0; // Establecido en 0 según solicitud
-  const today = startOfDay(new Date());
+  const today = startOfDay(toNicaraguaTime(nowInNicaragua()));
 
   // Ensure paymentPlan and registeredPayments are arrays
   const paymentPlan = Array.isArray(credit.paymentPlan) ? credit.paymentPlan : [];

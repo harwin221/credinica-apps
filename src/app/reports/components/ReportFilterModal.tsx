@@ -22,7 +22,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import type { User, Sucursal, UserRole } from '@/lib/types';
+import type { AppUser as User, Sucursal, UserRole } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 
 interface FilterItem {
@@ -134,10 +134,23 @@ export function ReportFilterModal({
   const [viewType, setViewType] = React.useState<'detailed' | 'summary'>('detailed');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const supervisorOptions: FilterItem[] = React.useMemo(() => [
-    { id: 'OFICINA', name: 'OFICINA' },
-    ...supervisors.map(s => ({ id: s.id, name: s.fullName }))
-  ], [supervisors]);
+  // Filtrar supervisores basado en sucursales seleccionadas
+  const supervisorOptions: FilterItem[] = React.useMemo(() => {
+    // Si no hay sucursales seleccionadas, no mostrar supervisores
+    if (selectedSucursales.length === 0) {
+      return [];
+    }
+    
+    // Filtrar supervisores que pertenecen a las sucursales seleccionadas
+    const filteredSupervisors = supervisors.filter(s => 
+      s.sucursal && selectedSucursales.includes(s.sucursal)
+    );
+    
+    return [
+      { id: 'OFICINA', name: 'OFICINA' },
+      ...filteredSupervisors.map(s => ({ id: s.id, name: s.fullName }))
+    ];
+  }, [supervisors, selectedSucursales]);
 
   const filteredUsers = React.useMemo(() => {
     let finalUsers: User[] = [];
@@ -162,9 +175,16 @@ export function ReportFilterModal({
   }, [selectedSupervisors, selectedSucursales, gestores, officeUsers]);
 
 
+  // Limpiar supervisores cuando cambian las sucursales
+  React.useEffect(() => {
+    setSelectedSupervisors([]);
+    setSelectedUsers([]);
+  }, [selectedSucursales]);
+  
+  // Limpiar usuarios cuando cambian los supervisores
   React.useEffect(() => {
     setSelectedUsers([]);
-  }, [selectedSupervisors, selectedSucursales]);
+  }, [selectedSupervisors]);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -217,6 +237,8 @@ export function ReportFilterModal({
                 items={supervisorOptions}
                 selectedItems={selectedSupervisors}
                 onSelectedItemsChange={setSelectedSupervisors}
+                disabled={selectedSucursales.length === 0}
+                emptyMessage="Seleccione una sucursal para ver supervisores."
               />
              <CheckboxFilterGroup
                 title="Usuario:"

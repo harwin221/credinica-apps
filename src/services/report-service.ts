@@ -17,11 +17,14 @@ export interface ReportFilters {
 }
 
 // --- Funciones auxiliares para manejo de fechas en reportes ---
+// IMPORTANTE: Para comparaciones de fechas en MySQL, usar solo la fecha (YYYY-MM-DD)
+// MySQL comparará usando DATE() para evitar problemas de zona horaria
 const getReportDateStart = (dateStr: string): string => {
     if (!dateStr) return '';
     try {
-        // Asegurar que la fecha se interprete como local de Nicaragua
-        return `${dateStr} 00:00:00`;
+        // Retornar solo la fecha, sin hora
+        // La comparación en SQL usará DATE(column) >= 'YYYY-MM-DD'
+        return dateStr;
     } catch (error) {
         console.error('Error parsing start date:', error);
         return '';
@@ -31,8 +34,9 @@ const getReportDateStart = (dateStr: string): string => {
 const getReportDateEnd = (dateStr: string): string => {
     if (!dateStr) return '';
     try {
-        // Asegurar que la fecha se interprete como local de Nicaragua
-        return `${dateStr} 23:59:59`;
+        // Retornar solo la fecha, sin hora
+        // La comparación en SQL usará DATE(column) <= 'YYYY-MM-DD'
+        return dateStr;
     } catch (error) {
         console.error('Error parsing end date:', error);
         return '';
@@ -47,6 +51,7 @@ export interface DisbursementItem {
     deliveryDate: string;
     disbursedBy: string;
     amount: number;
+    approvedAmount: number;
     interestRate: number;
     termMonths: number;
 }
@@ -290,8 +295,8 @@ export async function generateColocacionVsRecuperacionReport(filters: ReportFilt
 
     let recuperacionSql = `SELECT pr.managedBy, SUM(pr.amount) as total, MAX(pr.paymentDate) as lastDate FROM payments_registered pr WHERE pr.status != 'ANULADO'`;
     const recuperacionParams: any[] = [];
-    if (dateFrom) { recuperacionSql += ' AND pr.paymentDate >= ?'; recuperacionParams.push(getReportDateStart(dateFrom)); }
-    if (dateTo) { recuperacionSql += ' AND pr.paymentDate <= ?'; recuperacionParams.push(getReportDateEnd(dateTo)); }
+    if (dateFrom) { recuperacionSql += ' AND DATE(pr.paymentDate) >= ?'; recuperacionParams.push(getReportDateStart(dateFrom)); }
+    if (dateTo) { recuperacionSql += ' AND DATE(pr.paymentDate) <= ?'; recuperacionParams.push(getReportDateEnd(dateTo)); }
     recuperacionSql += ' GROUP BY pr.managedBy';
     const recuperacionRows: any[] = await query(recuperacionSql, recuperacionParams);
 
@@ -304,8 +309,8 @@ export async function generateColocacionVsRecuperacionReport(filters: ReportFilt
 
     let colocacionSql = `SELECT collectionsManager, SUM(principalAmount) as total, COUNT(id) as count FROM credits WHERE status IN ('Active', 'Paid')`;
     const colocacionParams: any[] = [];
-    if (dateFrom) { colocacionSql += ' AND deliveryDate >= ?'; colocacionParams.push(getReportDateStart(dateFrom)); }
-    if (dateTo) { colocacionSql += ' AND deliveryDate <= ?'; colocacionParams.push(getReportDateEnd(dateTo)); }
+    if (dateFrom) { colocacionSql += ' AND DATE(deliveryDate) >= ?'; colocacionParams.push(getReportDateStart(dateFrom)); }
+    if (dateTo) { colocacionSql += ' AND DATE(deliveryDate) <= ?'; colocacionParams.push(getReportDateEnd(dateTo)); }
     colocacionSql += ' GROUP BY collectionsManager';
     const colocacionRows: any[] = await query(colocacionSql, colocacionParams);
 
@@ -400,12 +405,12 @@ export async function generateNonRenewedReport(filters: ReportFilters): Promise<
     `;
     const params: any[] = [];
     if (filters.dateFrom) {
-        paidCreditsSql += ` AND pr.paymentDate >= ?`;
-        params.push(`${filters.dateFrom} 00:00:00`);
+        paidCreditsSql += ` AND DATE(pr.paymentDate) >= ?`;
+        params.push(filters.dateFrom);
     }
     if (filters.dateTo) {
-        paidCreditsSql += ` AND pr.paymentDate <= ?`;
-        params.push(`${filters.dateTo} 23:59:59`);
+        paidCreditsSql += ` AND DATE(pr.paymentDate) <= ?`;
+        params.push(filters.dateTo);
     }
     paidCreditsSql += ` GROUP BY c.id`;
 
@@ -433,18 +438,42 @@ export async function generateNonRenewedReport(filters: ReportFilters): Promise<
 }
 
 export async function generateProvisioningReport(): Promise<ProvisionCredit[]> {
+    // LÍMITE: Máximo 500 créditos para evitar sobrecarga
     const credits: any[] = await query(`
         SELECT 
             c.id, c.creditNumber, c.clientName, c.totalAmount, c.collectionsManager as gestorName
         FROM credits c
         WHERE c.status = 'Active'
+        LIMIT 500
     `);
 
     const results: ProvisionCredit[] = [];
+    
+    // Optimización: Obtener todos los pagos y planes de una vez
+    const creditIds = credits.map(c => c.id);
+    if (creditIds.length === 0) return results;
+    
+    const placeholders = creditIds.map(() => '?').join(',');
+    const allPayments: any[] = await query(`SELECT * FROM payments_registered WHERE creditId IN (${placeholders}) AND status != 'ANULADO'`, creditIds);
+    const allPaymentPlans: any[] = await query(`SELECT * FROM payment_plan WHERE creditId IN (${placeholders})`, creditIds);
+    
+    // Agrupar por creditId
+    const paymentsByCredit = new Map<string, any[]>();
+    const plansByCredit = new Map<string, any[]>();
+    
+    allPayments.forEach(p => {
+        if (!paymentsByCredit.has(p.creditId)) paymentsByCredit.set(p.creditId, []);
+        paymentsByCredit.get(p.creditId)!.push(p);
+    });
+    
+    allPaymentPlans.forEach(p => {
+        if (!plansByCredit.has(p.creditId)) plansByCredit.set(p.creditId, []);
+        plansByCredit.get(p.creditId)!.push(p);
+    });
 
     for (const credit of credits) {
-        const payments: any[] = await query(`SELECT * FROM payments_registered WHERE creditId = ? AND status != 'ANULADO'`, [credit.id]);
-        const paymentPlan: any[] = await query(`SELECT * FROM payment_plan WHERE creditId = ?`, [credit.id]);
+        const payments = paymentsByCredit.get(credit.id) || [];
+        const paymentPlan = plansByCredit.get(credit.id) || [];
 
         const fullCreditDetails: CreditDetail = {
             ...credit,
@@ -631,8 +660,8 @@ export async function generateExpiredCreditsReport(filters: ReportFilters): Prom
 
         detailedResults.push({
             ...credit,
-            deliveryDate: credit.deliveryDate ? new Date(credit.deliveryDate).toISOString() : null,
-            dueDate: credit.dueDate ? new Date(credit.dueDate).toISOString() : null,
+            deliveryDate: toISOString(credit.deliveryDate),
+            dueDate: toISOString(credit.dueDate),
             overdueAmount: statusDetails.overdueAmount,
             pendingBalance: statusDetails.remainingBalance,
             totalBalance: statusDetails.remainingBalance,
@@ -651,7 +680,17 @@ export async function generateConsolidatedStatement(clientId: string): Promise<C
     }
     const client: Client = clientResult[0];
 
-    const credits: CreditDetail[] = await query('SELECT id, clientId, amount, status, deliveryDate, firstPaymentDate FROM credits WHERE clientId = ? LIMIT 50', [clientId]);
+    // 1. Get just the IDs first
+    const creditIdsResult: any[] = await query('SELECT id FROM credits WHERE clientId = ? ORDER BY applicationDate DESC LIMIT 50', [clientId]);
+    if (!creditIdsResult.length) {
+        return { client, credits: [], creditCount: 0, averageCreditAmount: 0, globalAverageLateDays: 0, economicActivity: 'N/A' };
+    }
+    const creditIds = creditIdsResult.map(c => c.id);
+
+    // 2. Fetch the full details for each credit
+    const creditsPromises = creditIds.map(id => getCredit(id));
+    const creditsWithDetails = await Promise.all(creditsPromises);
+    const credits = creditsWithDetails.filter(c => c !== null) as CreditDetail[];
 
     const creditCount = credits.length;
     const totalCreditAmount = credits.reduce((sum, credit) => sum + credit.amount, 0);
@@ -663,22 +702,9 @@ export async function generateConsolidatedStatement(clientId: string): Promise<C
     const comercianteInfo: any[] = await query('SELECT economicActivity FROM comerciante_info WHERE clientId = ?', [clientId]);
     const economicActivity = comercianteInfo.length > 0 ? comercianteInfo[0].economicActivity : 'No especificada';
 
-
-    const formattedCredits = credits.map(credit => {
-        const { deliveryDate, dueDate, applicationDate, approvalDate, firstPaymentDate, ...rest } = credit;
-        return {
-            ...rest,
-            deliveryDate: deliveryDate ? new Date(deliveryDate).toISOString() : '',
-            dueDate: dueDate ? new Date(dueDate).toISOString() : '',
-            applicationDate: applicationDate ? new Date(applicationDate).toISOString() : '',
-            approvalDate: approvalDate ? new Date(approvalDate).toISOString() : null,
-            firstPaymentDate: firstPaymentDate ? new Date(firstPaymentDate).toISOString() : '',
-        };
-    });
-
     return {
         client,
-        credits: formattedCredits,
+        credits, // Return the full, correct credit objects
         creditCount,
         averageCreditAmount,
         globalAverageLateDays,
@@ -695,19 +721,20 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
             c.deliveryDate,
             c.disbursedBy,
             c.disbursedAmount as amount,
+            c.amount as approvedAmount, -- aqui se agrega el monto aprobado
             c.interestRate,
             c.termMonths
         FROM credits c
-        WHERE c.status IN ('Active', 'Paid', 'Expired', 'Fallecido') AND c.disbursedAmount > 0
+        WHERE c.status IN ('Active', 'Paid', 'Expired', 'Fallecido')
     `;
     const params: any[] = [];
 
     if (filters.dateFrom) {
-        sql += ' AND c.deliveryDate >= ?';
+        sql += ' AND DATE(c.deliveryDate) >= ?';
         params.push(getReportDateStart(filters.dateFrom));
     }
     if (filters.dateTo) {
-        sql += ' AND c.deliveryDate <= ?';
+        sql += ' AND DATE(c.deliveryDate) <= ?';
         params.push(getReportDateEnd(filters.dateTo));
     }
 
@@ -739,7 +766,7 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
 
     return results.map((row: any) => ({
         ...row,
-        deliveryDate: row.deliveryDate ? new Date(row.deliveryDate).toISOString() : null,
+        deliveryDate: toISOString(row.deliveryDate),
     })) as DisbursementItem[];
 }
 
@@ -766,8 +793,8 @@ export async function generatePaymentsDetailReport(filters: ReportFilters): Prom
     `;
     const params: any[] = [];
 
-    if (dateFrom) { sql += ` AND pr.paymentDate >= ?`; params.push(`${dateFrom} 00:00:00`); }
-    if (dateTo) { sql += ` AND pr.paymentDate <= ?`; params.push(`${dateTo} 23:59:59`); }
+    if (dateFrom) { sql += ` AND DATE(pr.paymentDate) >= ?`; params.push(dateFrom); }
+    if (dateTo) { sql += ` AND DATE(pr.paymentDate) <= ?`; params.push(dateTo); }
 
     sql += ' ORDER BY pr.paymentDate DESC LIMIT 1000'; // Limitar a 1000 registros para evitar sobrecarga
 
@@ -819,7 +846,11 @@ export async function generatePaymentsDetailReport(filters: ReportFilters): Prom
         const credit = creditsMap.get(p.creditId);
         if (!credit) continue;
 
-        const paymentsBeforeThis = (credit.registeredPayments || []).filter((rp: { paymentDate: string }) => new Date(rp.paymentDate) < new Date(p.paymentDate));
+        const paymentsBeforeThis = (credit.registeredPayments || []).filter((rp: { paymentDate: string }) => {
+            const rpDate = toISOString(rp.paymentDate);
+            const pDate = toISOString(p.paymentDate);
+            return rpDate && pDate && rpDate < pDate;
+        });
         const creditStateBefore = { ...credit, registeredPayments: paymentsBeforeThis };
         const statusBefore = calculateCreditStatusDetails(creditStateBefore, p.paymentDate);
 
@@ -851,7 +882,7 @@ export async function generatePaymentsDetailReport(filters: ReportFilters): Prom
         const principalRatio = p.totalAmount > 0 ? p.principalAmount / p.totalAmount : 0;
         return {
             transactionNumber: p.transactionNumber,
-            paymentDate: new Date(p.paymentDate).toISOString(),
+            paymentDate: toISOString(p.paymentDate) || '',
             clientName: p.clientName,
             clientCode: p.clientCode,
             gestorName: p.gestorName,
@@ -903,8 +934,8 @@ export async function generateRecoveryReport(filters: ReportFilters): Promise<Re
             WHERE c.collectionsManager = ? AND c.status = 'Active'
         `;
         const expectedParams: any[] = [user.fullName];
-        if (dateFrom) { expectedAmountSql += ` AND pp.paymentDate >= ?`; expectedParams.push(dateFrom); }
-        if (dateTo) { expectedAmountSql += ` AND pp.paymentDate <= ?`; expectedParams.push(dateTo); }
+        if (dateFrom) { expectedAmountSql += ` AND DATE(pp.paymentDate) >= ?`; expectedParams.push(dateFrom); }
+        if (dateTo) { expectedAmountSql += ` AND DATE(pp.paymentDate) <= ?`; expectedParams.push(dateTo); }
 
         const expectedResult: any[] = await query(expectedAmountSql, expectedParams);
         const expectedAmount = expectedResult[0]?.total || 0;
@@ -912,8 +943,8 @@ export async function generateRecoveryReport(filters: ReportFilters): Promise<Re
         // Monto Recuperado
         let collectedAmountSql = `SELECT SUM(amount) as total FROM payments_registered WHERE managedBy = ? AND status != 'ANULADO'`;
         const collectedParams: any[] = [user.fullName];
-        if (dateFrom) { collectedAmountSql += ` AND paymentDate >= ?`; collectedParams.push(`${dateFrom} 00:00:00`); }
-        if (dateTo) { collectedAmountSql += ` AND paymentDate <= ?`; collectedParams.push(`${dateTo} 23:59:59`); }
+        if (dateFrom) { collectedAmountSql += ` AND DATE(paymentDate) >= ?`; collectedParams.push(dateFrom); }
+        if (dateTo) { collectedAmountSql += ` AND DATE(paymentDate) <= ?`; collectedParams.push(dateTo); }
 
         const collectedResult: any[] = await query(collectedAmountSql, collectedParams);
         const collectedAmount = collectedResult[0]?.total || 0;
@@ -956,11 +987,11 @@ export async function generateFutureInstallmentsReport(filters: ReportFilters): 
     const params: any[] = [];
 
     if (dateFrom) {
-        sql += ` AND p.paymentDate >= ?`;
+        sql += ` AND DATE(p.paymentDate) >= ?`;
         params.push(dateFrom);
     }
     if (dateTo) {
-        sql += ` AND p.paymentDate <= ?`;
+        sql += ` AND DATE(p.paymentDate) <= ?`;
         params.push(dateTo);
     }
 
@@ -1041,11 +1072,11 @@ export async function generateRejectionAnalysisReport(filters: ReportFilters): P
     const params: any[] = [];
 
     if (dateFrom) {
-        sql += ` AND c.applicationDate >= ?`;
+        sql += ` AND DATE(c.applicationDate) >= ?`;
         params.push(getReportDateStart(dateFrom));
     }
     if (dateTo) {
-        sql += ` AND c.applicationDate <= ?`;
+        sql += ` AND DATE(c.applicationDate) <= ?`;
         params.push(getReportDateEnd(dateTo));
     }
 
@@ -1077,7 +1108,7 @@ export async function generateRejectionAnalysisReport(filters: ReportFilters): P
 
     return results.map((row: any) => ({
         ...row,
-        applicationDate: row.applicationDate ? new Date(row.applicationDate).toISOString() : null,
+        applicationDate: toISOString(row.applicationDate),
     })) as RejectionAnalysisItem[];
 }
 

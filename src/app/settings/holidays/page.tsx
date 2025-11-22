@@ -89,11 +89,22 @@ export default function HolidaysPage() {
     return (
         <>
             <div className="space-y-6">
-                <div className="flex justify-end">
-                    <Button onClick={() => setIsFormOpen(true)}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Agregar Feriado
+                {/* Botón de regresar */}
+                <div className="flex items-center justify-between">
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push('/settings')}
+                        className="flex items-center gap-2"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Regresar a Configuración
                     </Button>
+                    <div>
+                        <Button onClick={() => setIsFormOpen(true)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Agregar Feriado
+                        </Button>
+                    </div>
                 </div>
                 <Card>
                     <CardHeader>
@@ -114,7 +125,7 @@ export default function HolidaysPage() {
                                     holidays.map(holiday => (
                                         <TableRow key={holiday.id}>
                                             <TableCell className="font-medium">
-                                                {format(parseISO(holiday.date), 'dd \'de\' MMMM \'de\' yyyy', { locale: es })}
+                                                {format(parseISO(holiday.date + 'T12:00:00'), 'dd \'de\' MMMM \'de\' yyyy', { locale: es })}
                                             </TableCell>
                                             <TableCell>{holiday.name}</TableCell>
                                             <TableCell className="text-right">

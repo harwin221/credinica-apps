@@ -14,9 +14,9 @@ interface ReportHeaderProps {
 const formatDate = (dateString?: string | null) => {
     if (!dateString) return null;
     try {
-        // Asume que la fecha viene como YYYY-MM-DD del filtro.
-        // parseISO manejará esto correctamente.
-        return format(parseISO(dateString), 'dd/MM/yyyy', { locale: es });
+        // Agregar mediodía para fechas sin hora para evitar problemas de zona horaria
+        const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? dateString + 'T12:00:00' : dateString;
+        return format(parseISO(dateToFormat), 'dd/MM/yyyy', { locale: es });
     } catch {
         return 'Fecha Inválida';
     }

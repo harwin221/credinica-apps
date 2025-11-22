@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   return NextResponse.json({
     api_version: '1.0.0',
-    app_name: 'CrediNica',
+    app_name: 'CrediNic',
     min_client_version: '1.0.0',
     features: [
       'authentication',

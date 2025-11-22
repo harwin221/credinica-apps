@@ -53,6 +53,7 @@ export const toISOString = (dateInput: any): string | null => {
  * Obtiene la fecha/hora actual en Nicaragua como ISO string
  */
 export const nowInNicaragua = (): string => {
+    // Obtener hora actual en zona horaria de Nicaragua
     const now = new Date();
     const nicaraguaTime = toZonedTime(now, NICARAGUA_TIMEZONE);
     return nicaraguaTime.toISOString();
@@ -74,7 +75,8 @@ export const fromNicaraguaTime = (localDate: Date): Date => {
 };
 
 /**
- * Formatea una fecha para mostrar al usuario en hora local de Nicaragua
+ * Formatea una fecha para mostrar al usuario en hora de Nicaragua
+ * CORRECTO: Las fechas de MySQL vienen en UTC, convertir a Nicaragua para mostrar
  */
 export const formatDateForUser = (
     dateInput: string | Date | null | undefined,
@@ -86,11 +88,26 @@ export const formatDateForUser = (
         let date: Date;
         
         if (typeof dateInput === 'string') {
-            date = parseISO(dateInput);
+            let dateString = dateInput.trim();
+            
+            // Si es formato MySQL solo fecha (YYYY-MM-DD) sin hora
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+                // Para fechas sin hora, NO convertir zona horaria, solo formatear
+                // Esto evita el problema de "un día antes"
+                date = parseISO(dateString + 'T12:00:00'); // Usar mediodía para evitar problemas de zona horaria
+                return format(date, formatString, { locale: es });
+            }
+            
+            // Si es formato MySQL con hora (YYYY-MM-DD HH:MM:SS)
+            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(dateString)) {
+                // MySQL devuelve fechas en UTC, agregar Z para indicarlo
+                dateString = dateString.replace(' ', 'T') + 'Z';
+            }
+            
+            date = parseISO(dateString);
         } else if (dateInput instanceof Date) {
             date = dateInput;
         } else {
-            // Si no es string ni Date, intentar convertir a string primero
             const stringValue = String(dateInput);
             if (stringValue && stringValue !== 'null' && stringValue !== 'undefined') {
                 date = parseISO(stringValue);
@@ -101,6 +118,7 @@ export const formatDateForUser = (
         
         if (!isValid(date)) return 'Fecha Inválida';
 
+        // Convertir de UTC a hora de Nicaragua y formatear
         return formatInTimeZone(date, NICARAGUA_TIMEZONE, formatString, { locale: es });
     } catch (error) {
         console.error('Error formatting date:', error, 'Input:', dateInput);
@@ -119,6 +137,7 @@ export const formatDateTimeForUser = (
 
 /**
  * Convierte una fecha de input del usuario (asumida como hora local de Nicaragua) a ISO string
+ * IMPORTANTE: Para fechas sin hora, mantener la fecha exacta sin conversión de zona horaria
  */
 export const userInputToISO = (dateInput: string | any): string | null => {
     if (!dateInput) return null;
@@ -131,13 +150,15 @@ export const userInputToISO = (dateInput: string | any): string | null => {
             return null;
         }
 
-        // Si es solo fecha, agregar hora local
-        let processedDateString = dateString;
+        // Si es solo fecha (YYYY-MM-DD), NO convertir zona horaria
+        // Simplemente devolver la fecha con hora 00:00:00 en formato ISO
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-            processedDateString = `${dateString}T00:00:00`;
+            // Usar mediodía para evitar problemas de zona horaria al guardar
+            return `${dateString}T12:00:00.000Z`;
         }
 
-        const localDate = new Date(processedDateString);
+        // Si tiene hora, entonces sí convertir de Nicaragua a UTC
+        const localDate = parseISO(dateString);
         if (!isValid(localDate)) return null;
 
         // Convertir de hora local de Nicaragua a UTC
@@ -174,6 +195,7 @@ export const isValidISODate = (dateString: string): boolean => {
 
 /**
  * Para uso en bases de datos MySQL - convierte ISO string a formato DATETIME
+ * La fecha ISO ya viene en UTC, solo formateamos para MySQL
  */
 export const isoToMySQLDateTime = (isoString: string | any): string => {
     if (!isoString) return '';
@@ -186,6 +208,9 @@ export const isoToMySQLDateTime = (isoString: string | any): string => {
         
         const date = parseISO(dateString);
         if (!isValid(date)) return '';
+        
+        // La fecha ISO ya está en UTC, solo formatear para MySQL
+        // MySQL guardará esto como UTC y al leer lo convertiremos a Nicaragua
         return format(date, 'yyyy-MM-dd HH:mm:ss');
     } catch (error) {
         console.error('Error converting ISO to MySQL DateTime:', error, 'Input:', isoString);

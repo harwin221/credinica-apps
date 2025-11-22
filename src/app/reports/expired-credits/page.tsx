@@ -18,7 +18,8 @@ const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', {
 const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     try {
-        return format(parseISO(dateString), 'dd/MM/yyyy');
+        const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? dateString + 'T12:00:00' : dateString;
+        return format(parseISO(dateToFormat), 'dd/MM/yyyy');
     } catch {
         return 'Fecha Inválida';
     }

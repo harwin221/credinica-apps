@@ -61,7 +61,7 @@ export async function GET(request: Request) {
 
     // Obtener configuraciones del sistema
     const systemConfig = {
-      companyName: 'CrediNica',
+      companyName: 'CrediNic',
       timezone: 'America/Managua',
       currency: 'NIO',
       receiptFooter: 'Gracias por su pago'

@@ -9,7 +9,7 @@ import { useUser } from '@/hooks/use-user';
 import { deleteCredit as deleteCreditAction } from '@/services/credit-service-server';
 import { getSucursales } from '@/services/sucursal-service';
 import { getUsers as getUsersServer } from '@/services/user-service-server';
-import type { CreditDetail, UserRole, User, Sucursal, CreditStatus } from '@/lib/types';
+import type { CreditDetail, UserRole, AppUser as User, AppUser, Sucursal, CreditStatus } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -58,7 +58,7 @@ export default function CreditsPage() {
   const [selectedGestor, setSelectedGestor] = React.useState<string>('all');
   
   const [sucursales, setSucursales] = React.useState<Sucursal[]>([]);
-  const [gestores, setGestores] = React.useState<User[]>([]);
+  const [gestores, setGestores] = React.useState<AppUser[]>([]);
   
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
   const [creditToDelete, setCreditToDelete] = React.useState<CreditDetail | null>(null);
@@ -67,15 +67,31 @@ export default function CreditsPage() {
   const [maxPage, setMaxPage] = React.useState(1);
   
   const canCreate = user && (user.role === 'ADMINISTRADOR' || user.role === 'OPERATIVO' || user.role === 'GESTOR' || user.role === 'SUPERVISOR' || user.role === 'GERENTE');
-  const canEdit = user && (user.role === 'ADMINISTRADOR' || user.role === 'OPERATIVO');
-  const canDelete = user && (user.role === 'ADMINISTRADOR' || user.role === 'GERENTE');
+  const canEdit = user && (user.role === 'ADMINISTRADOR' || user.role === 'OPERATIVO' || user.role === 'GERENTE');
+  const canDelete = user && user.role === 'ADMINISTRADOR';
   const isGlobalAdmin = user?.role === 'ADMINISTRADOR' || user?.role === 'FINANZAS';
+  
+  // Función para verificar si el usuario puede editar un crédito específico
+  const canEditCredit = (credit: CreditDetail) => {
+    if (!canEdit || !user) return false;
+    const userRole = user.role.toUpperCase();
+    
+    // ADMINISTRADOR puede editar cualquier crédito
+    if (userRole === 'ADMINISTRADOR') return true;
+    
+    // GERENTE y OPERATIVO solo pueden editar créditos de su sucursal
+    if (['GERENTE', 'OPERATIVO'].includes(userRole)) {
+      return credit.branch === user.sucursal;
+    }
+    
+    return false;
+  };
 
 
   React.useEffect(() => {
     const fetchFilterData = async () => {
       if (!user) return;
-      const [sucursalesData, usersData] = await Promise.all([getSucursales(), getUsersServer()]);
+      const [sucursalesData, usersData] = await Promise.all([getSucursales(), getUsersServer(user)]);
       setSucursales(sucursalesData);
       setGestores(usersData.filter(u => u.role === 'GESTOR'));
       if (!isGlobalAdmin && user.sucursal) setSelectedSucursal(user.sucursal);
@@ -152,7 +168,12 @@ export default function CreditsPage() {
     <>
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold tracking-tight">Gestión de Créditos ({allCredits.length})</h2>
+          <h2 className="text-2xl font-bold tracking-tight">
+            {user && ['GERENTE', 'SUPERVISOR', 'OPERATIVO'].includes(user.role.toUpperCase()) && user.sucursalName
+              ? `Créditos - ${user.sucursalName} (${allCredits.length})`
+              : `Gestión de Créditos (${allCredits.length})`
+            }
+          </h2>
           {canCreate && (
             <Button asChild>
                 <Link href="/credits/new">
@@ -251,7 +272,7 @@ export default function CreditsPage() {
                                 <DropdownMenuItem asChild>
                                 <Link href={`/credits/${credit.id}`}><Eye className="mr-2 h-4 w-4" /> Ver Detalles</Link>
                                 </DropdownMenuItem>
-                                {canEdit && (
+                                {canEditCredit(credit) && (
                                     <DropdownMenuItem asChild>
                                     <Link href={`/credits/${credit.id}/edit`}><Edit className="mr-2 h-4 w-4" /> Editar</Link>
                                     </DropdownMenuItem>
