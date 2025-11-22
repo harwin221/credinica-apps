@@ -6,13 +6,13 @@
   "icons": [
     {
       "src": "/CrediNica-inicial.png",
-      "sizes": "any",
+      "sizes": "192x192 512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/CrediNica-inicial.png",
-      "sizes": "any",
+      "src": "/CrediNica.png",
+      "sizes": "192x192 512x512",
       "type": "image/png",
       "purpose": "maskable"
     }
