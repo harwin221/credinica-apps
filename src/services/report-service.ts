@@ -718,7 +718,7 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
             c.id as creditId,
             c.creditNumber,
             c.clientName,
-            c.deliveryDate,
+            COALESCE(c.deliveryDate, c.approvalDate) as deliveryDate,
             c.disbursedBy,
             c.disbursedAmount as amount,
             c.amount as approvedAmount, -- aqui se agrega el monto aprobado
@@ -730,11 +730,11 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
     const params: any[] = [];
 
     if (filters.dateFrom) {
-        sql += ' AND DATE(c.deliveryDate) >= ?';
+        sql += ' AND DATE(COALESCE(c.deliveryDate, c.approvalDate)) >= ?';
         params.push(getReportDateStart(filters.dateFrom));
     }
     if (filters.dateTo) {
-        sql += ' AND DATE(c.deliveryDate) <= ?';
+        sql += ' AND DATE(COALESCE(c.deliveryDate, c.approvalDate)) <= ?';
         params.push(getReportDateEnd(filters.dateTo));
     }
 
