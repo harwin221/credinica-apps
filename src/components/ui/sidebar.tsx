@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -76,10 +75,37 @@ const SidebarProvider = React.forwardRef<
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
 
+    // INICIO BLOQUE MODIFICADO PARA MANEJAR COOKIES
+    // 1. Estado para el valor inicial (lo usamos para inicializar _open)
+    const [initialState] = React.useState(defaultOpen)
+    
+    // 2. Estado interno que usará el valor inicial
+    const [_open, _setOpen] = React.useState(initialState)
+    const open = openProp ?? _open
+
+    // 3. Efecto para leer la cookie SÓLO en el lado del cliente (después de montar)
+    React.useEffect(() => {
+        try {
+            const cookieValue = document.cookie
+                .split('; ')
+                .find(row => row.startsWith(SIDEBAR_COOKIE_NAME))
+                ?.split('=')[1];
+            
+            if (cookieValue !== undefined) {
+                // Convertir la cadena 'true'/'false' a booleano
+                const shouldBeOpen = cookieValue === 'true';
+                
+                // Forzar la actualización del estado interno con el valor de la cookie
+                _setOpen(shouldBeOpen); 
+            }
+        } catch (e) {
+            console.error("No se pudo leer la cookie del sidebar:", e);
+        }
+    }, []) // Array de dependencias vacío para que se ejecute solo al montar
+    // FIN BLOQUE MODIFICADO PARA MANEJAR COOKIES
+
     // Este es el estado interno de la barra lateral.
     // Usamos openProp y setOpenProp para el control desde fuera del componente.
-    const [_open, _setOpen] = React.useState(defaultOpen)
-    const open = openProp ?? _open
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
         const openState = typeof value === "function" ? value(open) : value
