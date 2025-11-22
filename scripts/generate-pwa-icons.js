@@ -1,29 +1,83 @@
-// Script para generar iconos PWA de diferentes tamaños
-// Ejecutar con: node scripts/generate-pwa-icons.js
-
+const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-// Tamaños de iconos necesarios para PWA
-const iconSizes = [
-  { size: 72, name: 'icon-72x72.png' },
-  { size: 96, name: 'icon-96x96.png' },
-  { size: 128, name: 'icon-128x128.png' },
-  { size: 144, name: 'icon-144x144.png' },
-  { size: 152, name: 'icon-152x152.png' },
-  { size: 192, name: 'icon-192x192.png' },
-  { size: 384, name: 'icon-384x384.png' },
-  { size: 512, name: 'icon-512x512.png' }
-];
+async function generateIcons() {
+  const inputImage = path.join(__dirname, '../public/CrediNica-inicial.png');
+  const outputDir = path.join(__dirname, '../public');
 
-console.log('Para generar iconos PWA de diferentes tamaños:');
-console.log('1. Usa una herramienta como https://realfavicongenerator.net/');
-console.log('2. O usa ImageMagick con el siguiente comando:');
-console.log('');
+  console.log('🎨 Generando iconos para PWA...\n');
 
-iconSizes.forEach(icon => {
-  console.log(`convert CrediNica-inicial.png -resize ${icon.size}x${icon.size} ${icon.name}`);
-});
+  try {
+    // Verificar que existe la imagen de entrada
+    if (!fs.existsSync(inputImage)) {
+      console.error('❌ No se encontró CrediNica-inicial.png');
+      return;
+    }
 
-console.log('');
-console.log('Luego coloca todos los archivos en la carpeta public/');
+    // Generar icono 192x192 (any)
+    await sharp(inputImage)
+      .resize(192, 192, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toFile(path.join(outputDir, 'icon-192.png'));
+    console.log('✅ icon-192.png creado');
+
+    // Generar icono 512x512 (any)
+    await sharp(inputImage)
+      .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toFile(path.join(outputDir, 'icon-512.png'));
+    console.log('✅ icon-512.png creado');
+
+    // Generar icono 192x192 maskable (con fondo y padding)
+    await sharp({
+      create: {
+        width: 192,
+        height: 192,
+        channels: 4,
+        background: { r: 31, g: 41, b: 55, alpha: 1 } // #1f2937
+      }
+    })
+      .composite([{
+        input: await sharp(inputImage)
+          .resize(154, 154, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .toBuffer(),
+        gravity: 'center'
+      }])
+      .png()
+      .toFile(path.join(outputDir, 'icon-192-maskable.png'));
+    console.log('✅ icon-192-maskable.png creado');
+
+    // Generar icono 512x512 maskable (con fondo y padding)
+    await sharp({
+      create: {
+        width: 512,
+        height: 512,
+        channels: 4,
+        background: { r: 31, g: 41, b: 55, alpha: 1 } // #1f2937
+      }
+    })
+      .composite([{
+        input: await sharp(inputImage)
+          .resize(410, 410, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .toBuffer(),
+        gravity: 'center'
+      }])
+      .png()
+      .toFile(path.join(outputDir, 'icon-512-maskable.png'));
+    console.log('✅ icon-512-maskable.png creado');
+
+    console.log('\n🎉 ¡Iconos generados exitosamente!');
+    console.log('\nArchivos creados en public/:');
+    console.log('  - icon-192.png');
+    console.log('  - icon-512.png');
+    console.log('  - icon-192-maskable.png');
+    console.log('  - icon-512-maskable.png');
+    console.log('\nAhora ejecuta: npm run build');
+
+  } catch (error) {
+    console.error('❌ Error generando iconos:', error.message);
+  }
+}
+
+generateIcons();
