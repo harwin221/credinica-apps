@@ -22,7 +22,7 @@ const SETTINGS_ROLES: UserRole[] = ['ADMINISTRADOR'];
 
 export function UserProfile() {
   const router = useRouter();
-  const { user, setUser } = useUser();
+  const { user, setUser, loading } = useUser();
 
   const canViewSettings = user && SETTINGS_ROLES.includes(user.role.toUpperCase() as UserRole);
 
@@ -32,11 +32,19 @@ export function UserProfile() {
     router.push('/login');
     router.refresh(); // Ensure server components re-render
   };
-  
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+      </div>
+    );
+  }
+
   if (!user) {
     return null;
   }
-  
+
   const getInitials = (name: string = '') => {
     const parts = name.split(' ');
     if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
@@ -44,7 +52,7 @@ export function UserProfile() {
     const lastInitial = parts[parts.length - 1].charAt(0);
     return `${firstInitial}${lastInitial}`.toUpperCase();
   };
-  
+
   return (
     <div className="flex items-center gap-2">
       <DropdownMenu>
@@ -52,7 +60,7 @@ export function UserProfile() {
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-primary/20 text-primary font-bold">
-                  {getInitials(user.fullName)}
+                {getInitials(user.fullName)}
               </AvatarFallback>
             </Avatar>
           </Button>

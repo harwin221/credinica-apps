@@ -25,7 +25,7 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
   const { user, loading } = useUser();
   const pathname = usePathname();
   const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
-  
+
   const noSidebarRoutes = ['/login', '/setup'];
   const isPublicRoute = noSidebarRoutes.includes(pathname);
   const isReportRoute = pathname.startsWith('/reports/');
@@ -38,57 +38,48 @@ export function SidebarLayout({ children }: { children?: React.ReactNode }) {
     }
   }, [user, isPublicRoute]);
 
-  // Mostrar loader mientras carga el usuario
-  if (loading) {
-     return (
-       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Cargando...</p>
-        </div>
-      </div>
-    );
-  }
-  
+  // Loader eliminado para permitir renderizado optimista (Skeleton en componentes hijos)
+  // if (loading) { ... }
+
   // Rutas especiales sin sidebar
   if (isReportRoute) {
     return <main className="main-background-container min-h-screen">{children}</main>;
   }
-  
+
   if (isPublicRoute || !user) {
-     return <main className="main-background-container min-h-screen">{children}</main>;
+    return <main className="main-background-container min-h-screen">{children}</main>;
   }
 
   // Default layout for all authenticated users
   return (
     <>
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <AppLogo />
-        </SidebarHeader>
-        <SidebarContent>
-          <AppNavigation navItems={NAV_ITEMS} />
-        </SidebarContent>
-        <SidebarFooter>
-           {/* UserProfile is moved to the top bar */}
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarRail />
-      <SidebarInset>
-        <div className="flex items-center justify-between p-2 border-b bg-sidebar">
+      <SidebarProvider>
+        <Sidebar>
+          <SidebarHeader>
+            <AppLogo />
+          </SidebarHeader>
+          <SidebarContent>
+            <AppNavigation navItems={NAV_ITEMS} />
+          </SidebarContent>
+          <SidebarFooter>
+            {/* UserProfile is moved to the top bar */}
+          </SidebarFooter>
+        </Sidebar>
+        <SidebarRail />
+        <SidebarInset>
+          <div className="flex items-center justify-between p-2 border-b bg-sidebar">
             <SidebarTrigger />
             <UserProfile />
-        </div>
-         <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 main-background-container">
+          </div>
+          <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 main-background-container">
             {children}
-         </div>
-      </SidebarInset>
-    </SidebarProvider>
-     <ChangePasswordDialog 
-        isOpen={isPasswordModalOpen} 
-        onClose={() => setIsPasswordModalOpen(false)} 
-     />
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+      <ChangePasswordDialog
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+      />
     </>
   );
 }

@@ -33,19 +33,19 @@ function LayoutManager({ children }: { children: React.ReactNode }) {
           let successCount = 0;
           for (const p of pending) {
             try {
-              const result = await addPayment(p.creditId, p.paymentData, p.actorId);
+              const result = await addPayment(p.creditId, p.paymentData, user);
               if (result.success) {
                 await deletePendingPayment(p.timestamp);
                 successCount++;
               } else {
-                 console.error('Error sincronizando pago:', result.error);
+                console.error('Error sincronizando pago:', result.error);
               }
             } catch (error) {
               console.error('Fallo al sincronizar pago:', error);
             }
           }
           if (successCount > 0) {
-             toast({ title: "Sincronización Completa", description: `${successCount} pago(s) han sido sincronizados correctamente.`, variant: 'info' });
+            toast({ title: "Sincronización Completa", description: `${successCount} pago(s) han sido sincronizados correctamente.`, variant: 'info' });
           }
         }
       }
@@ -57,14 +57,8 @@ function LayoutManager({ children }: { children: React.ReactNode }) {
     return () => clearInterval(intervalId);
   }, [isOnline, user, toast]);
 
-  // Muestra un loader global solo mientras se verifica la sesión inicial.
-  if (loading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Loader eliminado para permitir renderizado optimista
+  // if (loading) { ... }
 
   // Si no hay usuario y estamos en una ruta pública, o si es una ruta de reporte,
   // renderiza el contenido sin el layout principal.
@@ -82,7 +76,7 @@ function LayoutManager({ children }: { children: React.ReactNode }) {
       </>
     );
   }
-  
+
   // Si no hay usuario y no es una ruta pública, el middleware ya habrá redirigido.
   // Mostramos los children, que en caso de not-found, será la página de not-found.
   if (!user && !isPublicRoute) {
@@ -92,7 +86,7 @@ function LayoutManager({ children }: { children: React.ReactNode }) {
   // Fallback en caso de que ninguna de las condiciones anteriores se cumpla.
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
     </div>
   );
 }
