@@ -16,12 +16,12 @@ import * as XLSX from 'xlsx';
 
 const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
-    const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? dateString + 'T12:00:00' : dateString;
-    return format(parseISO(dateToFormat), 'dd/MM/yyyy', { locale: es });
+  if (!dateString) return 'N/A';
+  const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? dateString + 'T12:00:00' : dateString;
+  return format(parseISO(dateToFormat), 'dd/MM/yyyy', { locale: es });
 };
 
-export default function DisbursementsReportPage() {
+function DisbursementsReportContent() {
   const searchParams = useSearchParams();
   const [reportData, setReportData] = React.useState<DisbursementItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -40,7 +40,7 @@ export default function DisbursementsReportPage() {
       };
       setDateFrom(filters.dateFrom || null);
       setDateTo(filters.dateTo || null);
-      
+
       const data = await generateDisbursementsReport(filters);
       setReportData(data);
       setIsLoading(false);
@@ -53,7 +53,7 @@ export default function DisbursementsReportPage() {
     setIsExporting(true);
     try {
       const { base64 } = await exportDisbursementsToExcel(reportData);
-       if (base64) {
+      if (base64) {
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -95,50 +95,63 @@ export default function DisbursementsReportPage() {
       <div className="report-container mx-auto">
         <ReportHeader title="Reporte de Desembolsos" dateFrom={dateFrom} dateTo={dateTo} />
         <div className="flex justify-end mb-4 no-print gap-2">
-            <Button onClick={handleExportToExcel} variant="outline" disabled={isExporting}>
-              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
-              {isExporting ? 'Exportando...' : 'Exportar a Excel'}
-            </Button>
-            <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
+          <Button onClick={handleExportToExcel} variant="outline" disabled={isExporting}>
+            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+            {isExporting ? 'Exportando...' : 'Exportar a Excel'}
+          </Button>
+          <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
         </div>
         <Table className="report-table-condensed">
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Nº Crédito</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Desembolsado por</TableHead>
-                    <TableHead className="text-right">Tasa</TableHead>
-                    <TableHead className="text-right">Plazo</TableHead>
-                    <TableHead className="text-right">Monto Aprobado</TableHead>
-                    <TableHead className="text-right">Monto Entregado</TableHead>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nº Crédito</TableHead>
+              <TableHead>Cliente</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Desembolsado por</TableHead>
+              <TableHead className="text-right">Tasa</TableHead>
+              <TableHead className="text-right">Plazo</TableHead>
+              <TableHead className="text-right">Monto Aprobado</TableHead>
+              <TableHead className="text-right">Monto Entregado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reportData.length > 0 ? (
+              reportData.map((item) => (
+                <TableRow key={item.creditId}>
+                  <TableCell>{item.creditNumber}</TableCell>
+                  <TableCell>{item.clientName}</TableCell>
+                  <TableCell>{formatDate(item.deliveryDate)}</TableCell>
+                  <TableCell>{item.disbursedBy}</TableCell>
+                  <TableCell className="text-right">{item.interestRate}%</TableCell>
+                  <TableCell className="text-right">{item.termMonths} Meses</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.approvedAmount)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
                 </TableRow>
-            </TableHeader>
-            <TableBody>
-                {reportData.length > 0 ? (
-                reportData.map((item) => (
-                    <TableRow key={item.creditId}>
-                        <TableCell>{item.creditNumber}</TableCell>
-                        <TableCell>{item.clientName}</TableCell>
-                        <TableCell>{formatDate(item.deliveryDate)}</TableCell>
-                        <TableCell>{item.disbursedBy}</TableCell>
-                        <TableCell className="text-right">{item.interestRate}%</TableCell>
-                        <TableCell className="text-right">{item.termMonths} Meses</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.approvedAmount)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
-                    </TableRow>
-                ))
-                ) : (
-                <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">No se encontraron desembolsos para los filtros seleccionados.</TableCell>
-                </TableRow>
-                )}
-            </TableBody>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={8} className="h-24 text-center">No se encontraron desembolsos para los filtros seleccionados.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
         </Table>
-         <div className="mt-4 text-right font-bold text-base pr-4">
-            Total Aprobado: {formatCurrency(totalApproved)}
+        <div className="mt-4 text-right font-bold text-base pr-4">
+          Total Aprobado: {formatCurrency(totalApproved)}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DisbursementsReportPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="ml-2">Cargando reporte...</p>
+      </div>
+    }>
+      <DisbursementsReportContent />
+    </React.Suspense>
   );
 }

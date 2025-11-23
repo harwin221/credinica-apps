@@ -16,13 +16,13 @@ import { cn } from '@/lib/utils';
 
 const formatCurrency = (amount: number) => amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
-    try {
-        const date = parseISO(dateString);
-        return format(date, 'dd/MM/yyyy');
-    } catch {
-        return 'Fecha Inválida';
-    }
+  if (!dateString) return 'N/A';
+  try {
+    const date = parseISO(dateString);
+    return format(date, 'dd/MM/yyyy');
+  } catch {
+    return 'Fecha Inválida';
+  }
 };
 
 interface GroupedData {
@@ -40,7 +40,7 @@ const TotalsRow = ({ credits, label }: { credits: OverdueCreditItem[], label: st
   const totalIntMora = credits.reduce((sum, item) => sum + (item.lateFee || 0), 0);
   const totalCAIM = credits.reduce((sum, item) => sum + (item.totalToPay || 0), 0);
   const totalSaldo = credits.reduce((sum, item) => sum + (item.remainingBalance || 0), 0);
-  
+
   return (
     <TableRow className="font-bold bg-muted/50 text-[10px]">
       <TableCell colSpan={6} className="text-left font-bold uppercase">{label}: {credits.length}</TableCell>
@@ -57,7 +57,7 @@ const TotalsRow = ({ credits, label }: { credits: OverdueCreditItem[], label: st
 };
 
 
-export default function OverdueCreditsReportPage() {
+function OverdueCreditsReportContent() {
   const searchParams = useSearchParams();
   const [groupedData, setGroupedData] = React.useState<GroupedData[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -76,7 +76,7 @@ export default function OverdueCreditsReportPage() {
       };
       setDateFrom(filters.dateFrom || null);
       setDateTo(filters.dateTo || null);
-      
+
       const data = await generateOverdueCreditsReport(filters);
 
       const gestorMap: Record<string, GroupedData> = {};
@@ -93,11 +93,11 @@ export default function OverdueCreditsReportPage() {
           gestorMap[gestor].creditosVencidos.push(item);
         }
       });
-      
+
       setGroupedData(Object.values(gestorMap));
       setIsLoading(false);
     };
-    
+
     fetchData();
   }, [searchParams]);
 
@@ -107,7 +107,7 @@ export default function OverdueCreditsReportPage() {
     try {
       const allItems = groupedData.flatMap(g => [...g.creditosDiario, ...g.creditosMora, ...g.creditosVencidos]);
       const { base64 } = await exportOverdueCreditsToExcel(allItems);
-       if (base64) {
+      if (base64) {
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -143,21 +143,21 @@ export default function OverdueCreditsReportPage() {
   }
 
   const renderCreditRow = (item: OverdueCreditItem, index: number) => (
-     <TableRow key={`${item.creditId}-${item.type}-${index}`}>
-        <TableCell>{item.creditNumber}</TableCell>
-        <TableCell>{item.clientName}</TableCell>
-        <TableCell>{item.clientAddress}</TableCell>
-        <TableCell>{item.clientPhone}</TableCell>
-        <TableCell>{formatDate(item.deliveryDate)}</TableCell>
-        <TableCell>{formatDate(item.dueDate)}</TableCell>
-        <TableCell className="text-right">{formatCurrency(item.installmentAmount)}</TableCell>
-        <TableCell className="text-right">{formatCurrency(item.overdueAmount)}</TableCell>
-        <TableCell className="text-right">{item.lateDays}</TableCell>
-        <TableCell className="text-right">{formatCurrency(item.lateFee)}</TableCell>
-        <TableCell className="text-right">{formatCurrency(item.totalToPay)}</TableCell>
-        <TableCell className="text-right">{formatDate(item.lastPaymentDate)}</TableCell>
-        <TableCell className="text-right">{formatCurrency(item.remainingBalance)}</TableCell>
-        <TableCell>{item.type}</TableCell>
+    <TableRow key={`${item.creditId}-${item.type}-${index}`}>
+      <TableCell>{item.creditNumber}</TableCell>
+      <TableCell>{item.clientName}</TableCell>
+      <TableCell>{item.clientAddress}</TableCell>
+      <TableCell>{item.clientPhone}</TableCell>
+      <TableCell>{formatDate(item.deliveryDate)}</TableCell>
+      <TableCell>{formatDate(item.dueDate)}</TableCell>
+      <TableCell className="text-right">{formatCurrency(item.installmentAmount)}</TableCell>
+      <TableCell className="text-right">{formatCurrency(item.overdueAmount)}</TableCell>
+      <TableCell className="text-right">{item.lateDays}</TableCell>
+      <TableCell className="text-right">{formatCurrency(item.lateFee)}</TableCell>
+      <TableCell className="text-right">{formatCurrency(item.totalToPay)}</TableCell>
+      <TableCell className="text-right">{formatDate(item.lastPaymentDate)}</TableCell>
+      <TableCell className="text-right">{formatCurrency(item.remainingBalance)}</TableCell>
+      <TableCell>{item.type}</TableCell>
     </TableRow>
   );
 
@@ -166,54 +166,54 @@ export default function OverdueCreditsReportPage() {
       <div className="report-container mx-auto">
         <ReportHeader title="Listado de Cobros Diario" dateFrom={dateFrom} dateTo={dateTo} />
         <div className="flex justify-end mb-4 no-print gap-2">
-            <Button onClick={handleExportToExcel} variant="outline" disabled={isExporting}>
-              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
-              {isExporting ? 'Exportando...' : 'Exportar a Excel'}
-            </Button>
-            <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
+          <Button onClick={handleExportToExcel} variant="outline" disabled={isExporting}>
+            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+            {isExporting ? 'Exportando...' : 'Exportar a Excel'}
+          </Button>
+          <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
         </div>
-        
+
         {groupedData.length > 0 ? (
           groupedData.map((group) => (
-             <div key={group.gestorName} className="break-inside-avoid mb-8">
+            <div key={group.gestorName} className="break-inside-avoid mb-8">
               <h2 className="font-bold text-[12px] uppercase mb-2">{group.gestorName}</h2>
               <Table className="report-table-condensed">
                 <TableHeader>
                   <TableRow>
-                      <TableHead>Crédito</TableHead>
-                      <TableHead>Nombre del Cliente</TableHead>
-                      <TableHead>Dirección</TableHead>
-                      <TableHead>Teléfono</TableHead>
-                      <TableHead>Desembolso</TableHead>
-                      <TableHead>Vence</TableHead>
-                      <TableHead className="text-right">Cuota</TableHead>
-                      <TableHead className="text-right">Atraso</TableHead>
-                      <TableHead className="text-right">Dias</TableHead>
-                      <TableHead className="text-right">Int Mora</TableHead>
-                      <TableHead className="text-right">C+A+IM</TableHead>
-                      <TableHead className="text-right">Ultimo pago</TableHead>
-                      <TableHead className="text-right">Saldo</TableHead>
-                      <TableHead>Tipo</TableHead>
+                    <TableHead>Crédito</TableHead>
+                    <TableHead>Nombre del Cliente</TableHead>
+                    <TableHead>Dirección</TableHead>
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead>Desembolso</TableHead>
+                    <TableHead>Vence</TableHead>
+                    <TableHead className="text-right">Cuota</TableHead>
+                    <TableHead className="text-right">Atraso</TableHead>
+                    <TableHead className="text-right">Dias</TableHead>
+                    <TableHead className="text-right">Int Mora</TableHead>
+                    <TableHead className="text-right">C+A+IM</TableHead>
+                    <TableHead className="text-right">Ultimo pago</TableHead>
+                    <TableHead className="text-right">Saldo</TableHead>
+                    <TableHead>Tipo</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow className="bg-gray-100 h-2 p-0"><TableCell colSpan={14} className="h-2 p-0 font-bold text-center">CRÉDITOS DIARIO</TableCell></TableRow>
                   {group.creditosDiario.length > 0 ? group.creditosDiario.map(renderCreditRow) : <TableRow><TableCell colSpan={14} className="text-center h-10">No hay cobros diarios.</TableCell></TableRow>}
                   <TotalsRow credits={group.creditosDiario} label={`Total Diario`} />
-                   
-                   <TableRow className="bg-gray-200 h-2 p-0"><TableCell colSpan={14} className="h-2 p-0"></TableCell></TableRow>
-                   
-                   <TableRow className="bg-gray-100 h-2 p-0"><TableCell colSpan={14} className="h-2 p-0 font-bold text-center">CRÉDITOS EN MORA</TableCell></TableRow>
-                   {group.creditosMora.length > 0 ? group.creditosMora.map(renderCreditRow) : <TableRow><TableCell colSpan={14} className="text-center h-10">No hay créditos en mora.</TableCell></TableRow>}
-                   <TotalsRow credits={group.creditosMora} label={`Total Mora`} />
 
-                   <TableRow className="bg-gray-200 h-2 p-0"><TableCell colSpan={14} className="h-2 p-0"></TableCell></TableRow>
-                   
-                   <TableRow className="bg-gray-100 h-2 p-0"><TableCell colSpan={14} className="h-2 p-0 font-bold text-center">CRÉDITOS VENCIDOS</TableCell></TableRow>
-                   {group.creditosVencidos.length > 0 ? group.creditosVencidos.map(renderCreditRow) : <TableRow><TableCell colSpan={14} className="text-center h-10">No hay créditos vencidos.</TableCell></TableRow>}
-                   <TotalsRow credits={group.creditosVencidos} label={`Total Vencidos`} />
+                  <TableRow className="bg-gray-200 h-2 p-0"><TableCell colSpan={14} className="h-2 p-0"></TableCell></TableRow>
+
+                  <TableRow className="bg-gray-100 h-2 p-0"><TableCell colSpan={14} className="h-2 p-0 font-bold text-center">CRÉDITOS EN MORA</TableCell></TableRow>
+                  {group.creditosMora.length > 0 ? group.creditosMora.map(renderCreditRow) : <TableRow><TableCell colSpan={14} className="text-center h-10">No hay créditos en mora.</TableCell></TableRow>}
+                  <TotalsRow credits={group.creditosMora} label={`Total Mora`} />
+
+                  <TableRow className="bg-gray-200 h-2 p-0"><TableCell colSpan={14} className="h-2 p-0"></TableCell></TableRow>
+
+                  <TableRow className="bg-gray-100 h-2 p-0"><TableCell colSpan={14} className="h-2 p-0 font-bold text-center">CRÉDITOS VENCIDOS</TableCell></TableRow>
+                  {group.creditosVencidos.length > 0 ? group.creditosVencidos.map(renderCreditRow) : <TableRow><TableCell colSpan={14} className="text-center h-10">No hay créditos vencidos.</TableCell></TableRow>}
+                  <TotalsRow credits={group.creditosVencidos} label={`Total Vencidos`} />
                 </TableBody>
-             </Table>
+              </Table>
             </div>
           ))
         ) : (
@@ -221,8 +221,21 @@ export default function OverdueCreditsReportPage() {
             No se encontraron créditos en mora para los filtros seleccionados.
           </div>
         )}
-        
+
       </div>
     </div>
+  );
+}
+
+export default function OverdueCreditsReportPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="ml-2">Cargando reporte...</p>
+      </div>
+    }>
+      <OverdueCreditsReportContent />
+    </React.Suspense>
   );
 }

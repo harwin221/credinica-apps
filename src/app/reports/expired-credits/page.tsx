@@ -16,18 +16,18 @@ import { es } from 'date-fns/locale';
 
 const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
-    try {
-        const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? dateString + 'T12:00:00' : dateString;
-        return format(parseISO(dateToFormat), 'dd/MM/yyyy');
-    } catch {
-        return 'Fecha Inválida';
-    }
+  if (!dateString) return 'N/A';
+  try {
+    const dateToFormat = /^\d{4}-\d{2}-\d{2}$/.test(dateString) ? dateString + 'T12:00:00' : dateString;
+    return format(parseISO(dateToFormat), 'dd/MM/yyyy');
+  } catch {
+    return 'Fecha Inválida';
+  }
 };
 
 const formatNumber = (num?: number) => (num !== null && num !== undefined) ? num.toFixed(2) : '0.00';
 
-export default function ExpiredCreditsReportPage() {
+function ExpiredCreditsReportContent() {
   const searchParams = useSearchParams();
   const [reportData, setReportData] = React.useState<ExpiredCreditItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -45,12 +45,12 @@ export default function ExpiredCreditsReportPage() {
       };
       setDateFrom(filters.dateFrom || null);
       setDateTo(filters.dateTo || null);
-      
+
       const data = await generateExpiredCreditsReport(filters);
       setReportData(data);
       setIsLoading(false);
     };
-    
+
     fetchData();
   }, [searchParams]);
 
@@ -84,7 +84,7 @@ export default function ExpiredCreditsReportPage() {
     acc[key].totalSaldos += item.totalBalance;
     return acc;
   }, {} as Record<string, any>);
-  
+
   const grandTotals = {
     entregado: reportData.reduce((sum, item) => sum + item.disbursedAmount, 0),
     atraso: reportData.reduce((sum, item) => sum + item.overdueAmount, 0),
@@ -99,7 +99,7 @@ export default function ExpiredCreditsReportPage() {
         <div className="flex justify-end mb-4 no-print">
           <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
         </div>
-        
+
         {Object.values(groupedData).length > 0 ? (
           Object.values(groupedData).map((group) => (
             <div key={`${group.sucursal}-${group.supervisor}-${group.gestor}`} className="mb-8 break-inside-avoid">
@@ -154,33 +154,46 @@ export default function ExpiredCreditsReportPage() {
             No se encontraron créditos con vencimiento en las fechas seleccionadas.
           </div>
         )}
-        
+
         <div className="mt-8">
-            <h3 className="font-bold text-[11px] mb-4 text-center">Montos Totales de las Sucursales</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center p-4 border rounded-md">
-                <div>
-                    <p className="text-muted-foreground text-xs">Total Clientes</p>
-                    <p className="font-bold text-lg">{reportData.length}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground text-xs">Total Monto Entregado</p>
-                    <p className="font-bold text-lg">{formatCurrency(grandTotals.entregado)}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground text-xs">Total Atrasos</p>
-                    <p className="font-bold text-lg">{formatCurrency(grandTotals.atraso)}</p>
-                </div>
-                 <div>
-                    <p className="text-muted-foreground text-xs">Total Pendiente</p>
-                    <p className="font-bold text-lg">{formatCurrency(grandTotals.pendiente)}</p>
-                </div>
-                <div className="md:col-span-4 mt-4">
-                    <p className="text-muted-foreground">GRAN TOTAL SALDOS</p>
-                    <p className="font-bold text-xl text-primary">{formatCurrency(grandTotals.saldos)}</p>
-                </div>
+          <h3 className="font-bold text-[11px] mb-4 text-center">Montos Totales de las Sucursales</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center p-4 border rounded-md">
+            <div>
+              <p className="text-muted-foreground text-xs">Total Clientes</p>
+              <p className="font-bold text-lg">{reportData.length}</p>
             </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Total Monto Entregado</p>
+              <p className="font-bold text-lg">{formatCurrency(grandTotals.entregado)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Total Atrasos</p>
+              <p className="font-bold text-lg">{formatCurrency(grandTotals.atraso)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Total Pendiente</p>
+              <p className="font-bold text-lg">{formatCurrency(grandTotals.pendiente)}</p>
+            </div>
+            <div className="md:col-span-4 mt-4">
+              <p className="text-muted-foreground">GRAN TOTAL SALDOS</p>
+              <p className="font-bold text-xl text-primary">{formatCurrency(grandTotals.saldos)}</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ExpiredCreditsReportPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="ml-2">Cargando reporte...</p>
+      </div>
+    }>
+      <ExpiredCreditsReportContent />
+    </React.Suspense>
   );
 }

@@ -18,7 +18,7 @@ import * as XLSX from 'xlsx';
 const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatPercentage = (rate: number) => `${rate.toFixed(2)}%`;
 
-export default function RecoveryReportPage() {
+function RecoveryReportContent() {
   const searchParams = useSearchParams();
   const [reportData, setReportData] = React.useState<RecoveryReportItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -37,7 +37,7 @@ export default function RecoveryReportPage() {
       };
       setDateFrom(filters.dateFrom || null);
       setDateTo(filters.dateTo || null);
-      
+
       const data = await generateRecoveryReport(filters);
       setReportData(data);
       setIsLoading(false);
@@ -50,7 +50,7 @@ export default function RecoveryReportPage() {
     setIsExporting(true);
     try {
       const { base64 } = await exportRecoveryToExcel(reportData);
-       if (base64) {
+      if (base64) {
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -94,55 +94,68 @@ export default function RecoveryReportPage() {
       <div className="report-container mx-auto">
         <ReportHeader title="Reporte de Meta de Cobranza" dateFrom={dateFrom} dateTo={dateTo} />
         <div className="flex justify-end mb-4 no-print gap-2">
-            <Button onClick={handleExportToExcel} variant="outline" disabled={isExporting}>
-              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
-              {isExporting ? 'Exportando...' : 'Exportar a Excel'}
-            </Button>
-            <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
+          <Button onClick={handleExportToExcel} variant="outline" disabled={isExporting}>
+            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+            {isExporting ? 'Exportando...' : 'Exportar a Excel'}
+          </Button>
+          <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
         </div>
         <Table className="report-table-condensed">
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Usuario</TableHead>
-                    <TableHead># Créditos</TableHead>
-                    <TableHead className="text-right">Meta de Cobro</TableHead>
-                    <TableHead className="text-right">Monto Recuperado</TableHead>
-                    <TableHead className="text-right">% Recuperación</TableHead>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Usuario</TableHead>
+              <TableHead># Créditos</TableHead>
+              <TableHead className="text-right">Meta de Cobro</TableHead>
+              <TableHead className="text-right">Monto Recuperado</TableHead>
+              <TableHead className="text-right">% Recuperación</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reportData.length > 0 ? (
+              reportData.map((item) => (
+                <TableRow key={item.gestorName}>
+                  <TableCell className="font-medium">{item.gestorName}</TableCell>
+                  <TableCell>{item.creditCount}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.expectedAmount)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.collectedAmount)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span>{formatPercentage(item.recoveryPercentage)}</span>
+                      <Progress value={item.recoveryPercentage} className="w-24 h-2 no-print" />
+                    </div>
+                  </TableCell>
                 </TableRow>
-            </TableHeader>
-            <TableBody>
-                {reportData.length > 0 ? (
-                reportData.map((item) => (
-                    <TableRow key={item.gestorName}>
-                        <TableCell className="font-medium">{item.gestorName}</TableCell>
-                        <TableCell>{item.creditCount}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.expectedAmount)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.collectedAmount)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <span>{formatPercentage(item.recoveryPercentage)}</span>
-                            <Progress value={item.recoveryPercentage} className="w-24 h-2 no-print" />
-                          </div>
-                        </TableCell>
-                    </TableRow>
-                ))
-                ) : (
-                <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">No se encontraron datos para los filtros seleccionados.</TableCell>
-                </TableRow>
-                )}
-            </TableBody>
-            <TableFooter>
-                <TableRow className="font-bold bg-muted/50">
-                    <TableCell>TOTALES</TableCell>
-                    <TableCell colSpan={1}></TableCell>
-                    <TableCell className="text-right">{formatCurrency(totalExpected)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totalCollected)}</TableCell>
-                    <TableCell className="text-right">{formatPercentage(totalRecoveryPercentage)}</TableCell>
-                </TableRow>
-            </TableFooter>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="h-24 text-center">No se encontraron datos para los filtros seleccionados.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+          <TableFooter>
+            <TableRow className="font-bold bg-muted/50">
+              <TableCell>TOTALES</TableCell>
+              <TableCell colSpan={1}></TableCell>
+              <TableCell className="text-right">{formatCurrency(totalExpected)}</TableCell>
+              <TableCell className="text-right">{formatCurrency(totalCollected)}</TableCell>
+              <TableCell className="text-right">{formatPercentage(totalRecoveryPercentage)}</TableCell>
+            </TableRow>
+          </TableFooter>
         </Table>
       </div>
     </div>
+  );
+}
+
+export default function RecoveryReportPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="ml-2">Cargando reporte...</p>
+      </div>
+    }>
+      <RecoveryReportContent />
+    </React.Suspense>
   );
 }

@@ -7,7 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateReceiptHtml } from '@/services/pdf/receipt-html';
 
-export default function ReceiptPage() {
+function ReceiptContent() {
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const [receiptHtml, setReceiptHtml] = React.useState<string | null>(null);
@@ -26,9 +26,9 @@ export default function ReceiptPage() {
                 if (!creditId || !paymentId) {
                     throw new Error('Faltan parámetros para generar el recibo.');
                 }
-                
+
                 const result = await generateReceiptHtml({ creditId, paymentId, isReprint });
-                
+
                 if (result.error) throw new Error(result.error);
 
                 if (result.html) {
@@ -70,9 +70,9 @@ export default function ReceiptPage() {
             </div>
         );
     }
-    
+
     if (error) {
-          return <div className="p-4 bg-red-100 text-red-800 border border-red-400 rounded-md">Error: {error}</div>;
+        return <div className="p-4 bg-red-100 text-red-800 border border-red-400 rounded-md">Error: {error}</div>;
     }
 
     if (receiptHtml) {
@@ -81,4 +81,17 @@ export default function ReceiptPage() {
     }
 
     return <div className="p-4">No se pudo generar el recibo.</div>;
+}
+
+export default function ReceiptPage() {
+    return (
+        <React.Suspense fallback={
+            <div className="flex h-screen items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <p className="ml-2">Cargando recibo...</p>
+            </div>
+        }>
+            <ReceiptContent />
+        </React.Suspense>
+    );
 }

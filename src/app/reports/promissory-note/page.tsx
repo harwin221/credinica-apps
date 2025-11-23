@@ -11,7 +11,7 @@ import { generatePromissoryNotePdf } from '@/services/pdf/promissory-note-pdf';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-export default function PromissoryNotePage() {
+function PromissoryNoteContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { toast } = useToast();
@@ -21,7 +21,7 @@ export default function PromissoryNotePage() {
 
     React.useEffect(() => {
         const creditId = searchParams.get('creditId');
-        
+
         const generatePdf = async () => {
             if (!creditId) {
                 setError('No se especificó un ID de crédito.');
@@ -31,10 +31,10 @@ export default function PromissoryNotePage() {
 
             setIsLoading(true);
             setError(null);
-            
+
             try {
                 const result = await generatePromissoryNotePdf(creditId);
-                
+
                 if (result.error) throw new Error(result.error);
                 if (result.pdfDataUri) {
                     setPdfUrl(result.pdfDataUri);
@@ -82,21 +82,21 @@ export default function PromissoryNotePage() {
             </div>
         );
     }
-    
+
     if (error) {
-          return (
-              <div className="p-4 sm:p-6 bg-gray-100 h-screen flex items-center justify-center">
-                  <div className="max-w-4xl mx-auto">
-                      <Card>
-                          <CardContent className="pt-6 text-center">
-                              <h2 className="text-xl font-bold text-destructive mb-2">Error al Generar Documento</h2>
-                              <p>{error}</p>
-                              <Button onClick={handleClose} className="mt-4">Cerrar</Button>
-                          </CardContent>
-                      </Card>
-                  </div>
-              </div>
-          );
+        return (
+            <div className="p-4 sm:p-6 bg-gray-100 h-screen flex items-center justify-center">
+                <div className="max-w-4xl mx-auto">
+                    <Card>
+                        <CardContent className="pt-6 text-center">
+                            <h2 className="text-xl font-bold text-destructive mb-2">Error al Generar Documento</h2>
+                            <p>{error}</p>
+                            <Button onClick={handleClose} className="mt-4">Cerrar</Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -107,7 +107,7 @@ export default function PromissoryNotePage() {
                     <Button variant="outline" onClick={handleClose}><X className="mr-2 h-4 w-4" /> Cerrar</Button>
                 </div>
             </div>
-             <div className="flex-grow w-full p-4 overflow-y-auto">
+            <div className="flex-grow w-full p-4 overflow-y-auto">
                 {pdfUrl ? (
                     <iframe src={pdfUrl} className="w-full h-full border-0 shadow-lg" title="Pagaré" />
                 ) : (
@@ -117,5 +117,18 @@ export default function PromissoryNotePage() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function PromissoryNotePage() {
+    return (
+        <React.Suspense fallback={
+            <div className="flex h-screen items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <p className="ml-2">Cargando pagaré...</p>
+            </div>
+        }>
+            <PromissoryNoteContent />
+        </React.Suspense>
     );
 }
