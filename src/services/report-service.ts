@@ -718,23 +718,24 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
             c.id as creditId,
             c.creditNumber,
             c.clientName,
-            COALESCE(c.deliveryDate, c.approvalDate) as deliveryDate,
+            c.deliveryDate,
             c.disbursedBy,
             c.disbursedAmount as amount,
-            c.amount as approvedAmount, -- aqui se agrega el monto aprobado
+            c.amount as approvedAmount,
             c.interestRate,
             c.termMonths
         FROM credits c
         WHERE c.status IN ('Active', 'Paid', 'Expired', 'Fallecido')
+        AND c.deliveryDate IS NOT NULL
     `;
     const params: any[] = [];
 
     if (filters.dateFrom) {
-        sql += ' AND DATE(COALESCE(c.deliveryDate, c.approvalDate)) >= ?';
+        sql += ' AND DATE(c.deliveryDate) >= ?';
         params.push(getReportDateStart(filters.dateFrom));
     }
     if (filters.dateTo) {
-        sql += ' AND DATE(COALESCE(c.deliveryDate, c.approvalDate)) <= ?';
+        sql += ' AND DATE(c.deliveryDate) <= ?';
         params.push(getReportDateEnd(filters.dateTo));
     }
 
@@ -760,10 +761,7 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
         }
     }
 
-    // Agregar filtro adicional: solo créditos que tienen disbursedBy (fueron desembolsados)
-    sql += ' AND c.disbursedBy IS NOT NULL';
-    
-    sql += ' ORDER BY COALESCE(c.deliveryDate, c.approvalDate) DESC';
+    sql += ' ORDER BY c.deliveryDate DESC';
 
     const results = await query(sql, params);
 
