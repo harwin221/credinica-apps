@@ -8,21 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Printer, FileSpreadsheet } from 'lucide-react';
+import type { RejectionAnalysisItem } from '@/lib/types';
 import { generateRejectionAnalysisReport, exportRejectionsToExcel } from '@/services/report-service';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
-
-interface RejectionAnalysisItem {
-  applicationId: string;
-  applicationDate: string;
-  clientName: string;
-  employmentType: string;
-  productType: string;
-  requestedAmount: number;
-  rejectionReason: string;
-  analystName: string;
-}
 
 const formatCurrency = (amount: number) => `C$${amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const formatDate = (dateString?: string) => {
@@ -98,7 +88,7 @@ function RejectionAnalysisReportContent() {
     );
   }
 
-  const totalRejectedAmount = reportData.reduce((sum, item) => sum + item.requestedAmount, 0);
+  const totalRejectedAmount = reportData.reduce((sum, item) => sum + item.amount, 0);
 
   return (
     <div className="p-4 sm:p-6 print-container bg-white text-black">
@@ -115,32 +105,30 @@ function RejectionAnalysisReportContent() {
         <Table className="report-table-condensed">
           <TableHeader>
             <TableRow>
-              <TableHead>Fecha</TableHead>
+              <TableHead>Fecha Solicitud</TableHead>
               <TableHead>Cliente</TableHead>
-              <TableHead>Tipo Empleo</TableHead>
-              <TableHead>Producto</TableHead>
+              <TableHead>Sucursal</TableHead>
               <TableHead className="text-right">Monto Solicitado</TableHead>
-              <TableHead>Motivo Rechazo</TableHead>
-              <TableHead>Analista</TableHead>
+              <TableHead>Motivo</TableHead>
+              <TableHead>Rechazado por</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {reportData.length > 0 ? (
               reportData.map((item) => (
-                <TableRow key={item.applicationId}>
+                <TableRow key={item.creditId}>
                   <TableCell>{formatDate(item.applicationDate)}</TableCell>
                   <TableCell>{item.clientName}</TableCell>
-                  <TableCell>{item.employmentType}</TableCell>
-                  <TableCell>{item.productType}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.requestedAmount)}</TableCell>
-                  <TableCell>{item.rejectionReason}</TableCell>
-                  <TableCell>{item.analystName}</TableCell>
+                  <TableCell>{item.sucursalName}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.amount)}</TableCell>
+                  <TableCell>{item.reason}</TableCell>
+                  <TableCell>{item.rejectedBy}</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
-                  No se encontraron solicitudes rechazadas para los filtros seleccionados.
+                <TableCell colSpan={6} className="h-24 text-center">
+                  No se encontraron créditos rechazados para los filtros seleccionados.
                 </TableCell>
               </TableRow>
             )}
