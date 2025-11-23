@@ -760,7 +760,10 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
         }
     }
 
-    sql += ' ORDER BY c.deliveryDate DESC';
+    // Agregar filtro adicional: solo créditos que tienen disbursedBy (fueron desembolsados)
+    sql += ' AND c.disbursedBy IS NOT NULL';
+    
+    sql += ' ORDER BY COALESCE(c.deliveryDate, c.approvalDate) DESC';
 
     const results = await query(sql, params);
 

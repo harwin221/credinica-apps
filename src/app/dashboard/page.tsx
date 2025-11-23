@@ -37,7 +37,9 @@ export default async function DashboardPage() {
     }
 
     const userRole = user.role.toUpperCase();
-    const todayNicaragua = format(new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Managua' })), 'yyyy-MM-dd');
+    // Usar la función correcta para obtener la fecha actual en Nicaragua
+    const { todayInNicaragua } = await import('@/lib/date-utils');
+    const todayNic = todayInNicaragua();
 
     switch (userRole) {
         case 'GESTOR': {
@@ -55,8 +57,8 @@ export default async function DashboardPage() {
             
             const initialReportData = await generateColocacionVsRecuperacionReport({
                 sucursales: sucursalesFilter,
-                dateFrom: todayNicaragua,
-                dateTo: todayNicaragua,
+                dateFrom: todayNic,
+                dateTo: todayNic,
             });
 
             return <GlobalDashboard user={user} initialSucursales={initialSucursales} initialReportData={initialReportData} />;

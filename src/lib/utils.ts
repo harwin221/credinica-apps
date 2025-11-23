@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { Payment, CalculatedPayment, PaymentScheduleArgs, PaymentFrequency, RegisteredPayment, CreditDetail, CreditStatus, CreditStatusDetails } from '@/lib/types';
-import { addWeeks, addDays, parseISO, startOfDay, isBefore, differenceInDays, format, isAfter, endOfDay, isEqual, isValid } from 'date-fns';
+import { addWeeks, addDays, addMonths, getDaysInMonth, parseISO, startOfDay, isBefore, differenceInDays, format, isAfter, endOfDay, isEqual, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 import { TIMEZONE } from './constants';
@@ -72,6 +72,13 @@ export const normalizeString = (str: string = ''): string => {
 
 /**
  * Ajusta una fecha al próximo día hábil, saltando fines de semana y feriados según la frecuencia.
+ * 
+ * REGLAS POR TIPO DE CRÉDITO:
+ * - Diario: NO permite sábados. Feriado → lunes
+ * - Semanal: SÍ permite sábados. Feriado viernes → sábado, feriado sábado → lunes
+ * - Catorcenal: NO permite sábados (solo L-V). Feriado viernes → sábado, feriado sábado → lunes
+ * - Quincenal: SÍ permite sábados. Feriado viernes → sábado, feriado sábado → lunes
+ * 
  * @param date La fecha a ajustar.
  * @param frequency La frecuencia de pago para aplicar las reglas correctas.
  * @param holidays Un arreglo de fechas de feriados en formato 'YYYY-MM-DD'.
@@ -94,34 +101,72 @@ export const adjustToNextBusinessDay = (date: Date, frequency: PaymentFrequency,
         iterations++;
         const dayOfWeek = newDate.getDay(); // 0 = Domingo, 6 = Sábado
 
-        // PASO 1: Verificar si es feriado (primero, antes de verificar día de semana)
-        if (isHoliday(newDate)) {
-            newDate = addDays(newDate, 1);
-            adjusted = true;
-            continue; // Volver a verificar la nueva fecha
-        }
-
-        // PASO 2: Verificar Domingo (aplica a TODOS los tipos de crédito)
+        // PASO 1: Verificar Domingo (aplica a TODOS los tipos de crédito)
         if (dayOfWeek === 0) {
             newDate = addDays(newDate, 1); // Mover a lunes
             adjusted = true;
             continue;
         }
 
-        // PASO 3: Verificar Sábado (reglas específicas por tipo de crédito)
+        // PASO 2: Verificar Sábado (reglas específicas por tipo de crédito)
         if (dayOfWeek === 6) {
             if (frequency === 'Diario') {
-                // Diarios: Saltar sábado y domingo, ir a lunes
+                // Diarios: NO permiten sábado, saltar a lunes
                 newDate = addDays(newDate, 2);
                 adjusted = true;
                 continue;
-            } else if (frequency === 'Semanal' || frequency === 'Catorcenal') {
-                // Semanal y Catorcenal: Mover a lunes
+            } else if (frequency === 'Catorcenal') {
+                // Catorcenales: NO permiten sábado (solo L-V), saltar a lunes
                 newDate = addDays(newDate, 2);
                 adjusted = true;
                 continue;
             }
-            // Quincenal: Se queda en sábado (no hace nada, es válido)
+            // Semanal y Quincenal: SÍ permiten sábado, continuar a verificar feriado
+        }
+
+        // PASO 3: Verificar si es feriado
+        if (isHoliday(newDate)) {
+            const currentDayOfWeek = newDate.getDay();
+            
+            if (frequency === 'Diario') {
+                // Diarios: Feriado → siguiente día hábil (lunes si es viernes)
+                newDate = addDays(newDate, 1);
+                adjusted = true;
+                continue;
+            } else if (frequency === 'Semanal') {
+                // Semanales: Feriado viernes → sábado, feriado sábado → lunes
+                if (currentDayOfWeek === 5) { // Viernes feriado
+                    newDate = addDays(newDate, 1); // Ir a sábado
+                } else if (currentDayOfWeek === 6) { // Sábado feriado
+                    newDate = addDays(newDate, 2); // Ir a lunes
+                } else {
+                    newDate = addDays(newDate, 1); // Siguiente día
+                }
+                adjusted = true;
+                continue;
+            } else if (frequency === 'Catorcenal') {
+                // Catorcenales: Feriado viernes → sábado, feriado sábado → lunes
+                if (currentDayOfWeek === 5) { // Viernes feriado
+                    newDate = addDays(newDate, 1); // Ir a sábado
+                } else if (currentDayOfWeek === 6) { // Sábado feriado
+                    newDate = addDays(newDate, 2); // Ir a lunes
+                } else {
+                    newDate = addDays(newDate, 1); // Siguiente día
+                }
+                adjusted = true;
+                continue;
+            } else if (frequency === 'Quincenal') {
+                // Quincenales: Feriado viernes → sábado, feriado sábado → lunes
+                if (currentDayOfWeek === 5) { // Viernes feriado
+                    newDate = addDays(newDate, 1); // Ir a sábado
+                } else if (currentDayOfWeek === 6) { // Sábado feriado
+                    newDate = addDays(newDate, 2); // Ir a lunes
+                } else {
+                    newDate = addDays(newDate, 1); // Siguiente día
+                }
+                adjusted = true;
+                continue;
+            }
         }
     }
     
@@ -190,16 +235,49 @@ export function generatePaymentSchedule(data: PaymentScheduleArgs): CalculatedPa
   // --- LÓGICA DE CÁLCULO REESTRUCTURADA ---
   let theoreticalDate = initialDate;
   let extensionDays = 0; // Para créditos diarios
+  
+  // Para quincenales, determinar si es día 2 o 17
+  let quincenalDay: 2 | 17 | null = null;
+  if (paymentFrequency === 'Quincenal') {
+    const startDay = initialDate.getDate();
+    // Si la fecha inicial es entre 1-9, usar día 2
+    // Si es entre 10-31, usar día 17
+    quincenalDay = startDay <= 9 ? 2 : 17;
+  }
 
   for (let i = 1; i <= numberOfPayments; i++) {
-    // 1. Ajusta la fecha TEÓRICA para esta cuota específica
-    let adjustedDate = adjustToNextBusinessDay(theoreticalDate, paymentFrequency, holidays);
+    let adjustedDate: Date;
+    
+    // Lógica especial para quincenales (días 2 y 17)
+    if (paymentFrequency === 'Quincenal' && quincenalDay) {
+      // Calcular en qué mes cae esta cuota
+      const monthsToAdd = Math.floor((i - 1) / 2);
+      const targetMonth = addMonths(initialDate, monthsToAdd);
+      
+      // Determinar si es día 2 o 17
+      const isFirstPaymentOfMonth = (i % 2 === 1);
+      const targetDay = isFirstPaymentOfMonth ? quincenalDay : (quincenalDay === 2 ? 17 : 2);
+      
+      // Asegurar que no caiga en día 31 (usar el último día del mes si es menor)
+      const daysInTargetMonth = getDaysInMonth(targetMonth);
+      const safeDay = Math.min(targetDay, daysInTargetMonth);
+      
+      // Crear la fecha teórica
+      theoreticalDate = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), safeDay);
+      
+      // Ajustar si cae en domingo o feriado
+      adjustedDate = adjustToNextBusinessDay(theoreticalDate, paymentFrequency, holidays);
+    } else {
+      // Lógica normal para otros tipos de crédito
+      // 1. Ajusta la fecha TEÓRICA para esta cuota específica
+      adjustedDate = adjustToNextBusinessDay(theoreticalDate, paymentFrequency, holidays);
 
-    // Si es crédito diario y el ajuste causó un salto de días, se cuenta para extender el vencimiento.
-    if(paymentFrequency === 'Diario') {
-      const daysDiff = differenceInDays(adjustedDate, theoreticalDate);
-      if(daysDiff > 0) {
-        extensionDays += daysDiff;
+      // Si es crédito diario y el ajuste causó un salto de días, se cuenta para extender el vencimiento.
+      if(paymentFrequency === 'Diario') {
+        const daysDiff = differenceInDays(adjustedDate, theoreticalDate);
+        if(daysDiff > 0) {
+          extensionDays += daysDiff;
+        }
       }
     }
     
@@ -216,21 +294,20 @@ export function generatePaymentSchedule(data: PaymentScheduleArgs): CalculatedPa
       balance: Math.max(0, remainingBalance),
     });
 
-    // 2. Avanza la fecha TEÓRICA para la siguiente iteración, sin contaminarla con el ajuste.
-    switch (paymentFrequency) {
-      case 'Diario':
-        // Siempre avanza al siguiente día hábil desde la fecha ajustada anterior para mantener la secuencia
-        theoreticalDate = adjustToNextBusinessDay(addDays(adjustedDate, 1), 'Diario', holidays);
-        break;
-      case 'Semanal':
-        theoreticalDate = addWeeks(theoreticalDate, 1);
-        break;
-      case 'Catorcenal':
-        theoreticalDate = addDays(theoreticalDate, 14);
-        break;
-      case 'Quincenal':
-        theoreticalDate = addDays(theoreticalDate, 15);
-        break;
+    // 2. Avanza la fecha TEÓRICA para la siguiente iteración (solo para no-quincenales)
+    if (paymentFrequency !== 'Quincenal') {
+      switch (paymentFrequency) {
+        case 'Diario':
+          // Siempre avanza al siguiente día hábil desde la fecha ajustada anterior para mantener la secuencia
+          theoreticalDate = adjustToNextBusinessDay(addDays(adjustedDate, 1), 'Diario', holidays);
+          break;
+        case 'Semanal':
+          theoreticalDate = addWeeks(theoreticalDate, 1);
+          break;
+        case 'Catorcenal':
+          theoreticalDate = addDays(theoreticalDate, 14);
+          break;
+      }
     }
   }
 
