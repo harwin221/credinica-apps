@@ -30,12 +30,12 @@ export async function decrypt(input: string): Promise<any> {
   }
 }
 
-export async function loginUser(credentials: {email: string; password: string;}): Promise<{success: boolean; error?: string}> {
+export async function loginUser(credentials: { email: string; password: string; }): Promise<{ success: boolean; error?: string }> {
   const { email, password } = credentials;
 
   try {
     const rows: any = await query('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
-    
+
     if (rows.length === 0) {
       console.error(`[Login Fallido] Usuario no encontrado para el email: ${email.toLowerCase()}`);
       return { success: false, error: 'Credenciales incorrectas.' };
@@ -44,32 +44,42 @@ export async function loginUser(credentials: {email: string; password: string;})
     const user = rows[0];
 
     if (!user.active) {
-       console.error(`[Login Fallido] La cuenta de usuario ${email.toLowerCase()} está inactiva.`);
-       return { success: false, error: 'La cuenta de usuario está inactiva.' };
+      console.error(`[Login Fallido] La cuenta de usuario ${email.toLowerCase()} está inactiva.`);
+      return { success: false, error: 'La cuenta de usuario está inactiva.' };
     }
 
     if (!user.hashed_password) {
-        console.error(`[Login Fallido] El usuario ${email.toLowerCase()} no tiene una contraseña (hashed_password) en la base de datos.`);
-        return { success: false, error: 'Cuenta de usuario corrupta. Contacte al administrador.' };
+      console.error(`[Login Fallido] El usuario ${email.toLowerCase()} no tiene una contraseña (hashed_password) en la base de datos.`);
+      return { success: false, error: 'Cuenta de usuario corrupta. Contacte al administrador.' };
     }
-    
+
     const passwordsMatch = await bcrypt.compare(password, user.hashed_password);
 
     if (!passwordsMatch) {
       console.error(`[Login Fallido] La contraseña proporcionada para ${email.toLowerCase()} no coincide con el hash almacenado.`);
       return { success: false, error: 'Credenciales incorrectas.' };
     }
-    
-    // En este punto, el inicio de sesión es exitoso.
+
+    // En este punto, el inicio de sesión es exitoso (credenciales válidas).
+
+    // VERIFICACIÓN DE CONTROL DE ACCESO (NUEVO)
+    const { checkAccess } = await import('@/services/settings-service');
+    const accessCheck = await checkAccess(user.role, user.sucursal_id);
+
+    if (!accessCheck.allowed) {
+      console.warn(`[Login Denegado] Usuario ${email} bloqueado por control de acceso: ${accessCheck.reason}`);
+      return { success: false, error: accessCheck.reason };
+    }
+
     console.log(`[Login Exitoso] Usuario autenticado: ${email.toLowerCase()}`);
-    
+
     const sessionPayload = {
-        userId: user.id,
-        role: user.role,
-        fullName: user.fullName,
-        email: user.email,
-        mustChangePassword: user.mustChangePassword,
-        supervisorId: user.supervisorId
+      userId: user.id,
+      role: user.role,
+      fullName: user.fullName,
+      email: user.email,
+      mustChangePassword: user.mustChangePassword,
+      supervisorId: user.supervisorId
     };
 
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
@@ -125,8 +135,8 @@ export async function getSession(): Promise<AppUser | null> {
  * @returns El objeto AppUser completo o null si no se encuentra.
  */
 async function getUserProfileFromDatabase(userId: string): Promise<AppUser | null> {
-    // Consulta optimizada: solo seleccionar campos necesarios, sin hashed_password
-    const sql = `
+  // Consulta optimizada: solo seleccionar campos necesarios, sin hashed_password
+  const sql = `
         SELECT id, fullName, email, phone, role, sucursal_id, sucursal_name, 
                active, mustChangePassword, supervisor_id, supervisor_name, 
                createdAt, updatedAt 
@@ -134,17 +144,17 @@ async function getUserProfileFromDatabase(userId: string): Promise<AppUser | nul
         WHERE id = ? AND active = 1 
         LIMIT 1
     `;
-    
-    const rows: any = await query(sql, [userId]);
-    if(rows.length > 0) {
-        const user = rows[0];
-        return {
-            ...user,
-            sucursal: user.sucursal_id,
-            sucursalName: user.sucursal_name,
-            supervisorId: user.supervisor_id,
-            supervisorName: user.supervisor_name
-        } as AppUser;
-    }
-    return null;
+
+  const rows: any = await query(sql, [userId]);
+  if (rows.length > 0) {
+    const user = rows[0];
+    return {
+      ...user,
+      sucursal: user.sucursal_id,
+      sucursalName: user.sucursal_name,
+      supervisorId: user.supervisor_id,
+      supervisorName: user.supervisor_name
+    } as AppUser;
+  }
+  return null;
 }

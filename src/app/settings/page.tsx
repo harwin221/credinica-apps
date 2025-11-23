@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Building, CalendarOff, Settings as SettingsIcon, Loader2, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Users, Building, CalendarOff, Settings as SettingsIcon, Loader2, RefreshCw, ArrowLeft, ShieldAlert } from 'lucide-react';
 import type { UserRole } from '@/lib/types';
 import { useUser } from '@/hooks/use-user';
 import { AccessDenied } from '@/components/AccessDenied';
@@ -71,6 +71,13 @@ export default function SettingsPage() {
       description: 'Configurar días no laborables para cálculos de pago.',
       icon: CalendarOff,
       href: '/settings/holidays',
+    },
+    {
+      title: 'Control de Acceso',
+      category: 'Seguridad',
+      description: 'Abrir o cerrar el acceso al sistema globalmente o por sucursal.',
+      icon: ShieldAlert,
+      href: '/settings/access-control',
     },
   ];
 

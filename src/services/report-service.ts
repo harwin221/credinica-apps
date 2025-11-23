@@ -269,7 +269,7 @@ export async function generateColocacionVsRecuperacionReport(filters: ReportFilt
         userNamesToFilter = userNamesResult.map(u => u.fullName);
     }
 
-    const allUsersSql = `SELECT id, fullName, sucursal_name, supervisor_name FROM users WHERE active = true`;
+    const allUsersSql = `SELECT id, fullName, sucursal_name, supervisor_name FROM users WHERE active = true AND role IN ('GESTOR', 'SUPERVISOR', 'ADMINISTRADOR', 'GERENTE')`;
     let userRows: any[] = await query(allUsersSql, []);
 
     if (sucursales && sucursales.length > 0) {
@@ -448,24 +448,24 @@ export async function generateProvisioningReport(): Promise<ProvisionCredit[]> {
     `);
 
     const results: ProvisionCredit[] = [];
-    
+
     // Optimización: Obtener todos los pagos y planes de una vez
     const creditIds = credits.map(c => c.id);
     if (creditIds.length === 0) return results;
-    
+
     const placeholders = creditIds.map(() => '?').join(',');
     const allPayments: any[] = await query(`SELECT * FROM payments_registered WHERE creditId IN (${placeholders}) AND status != 'ANULADO'`, creditIds);
     const allPaymentPlans: any[] = await query(`SELECT * FROM payment_plan WHERE creditId IN (${placeholders})`, creditIds);
-    
+
     // Agrupar por creditId
     const paymentsByCredit = new Map<string, any[]>();
     const plansByCredit = new Map<string, any[]>();
-    
+
     allPayments.forEach(p => {
         if (!paymentsByCredit.has(p.creditId)) paymentsByCredit.set(p.creditId, []);
         paymentsByCredit.get(p.creditId)!.push(p);
     });
-    
+
     allPaymentPlans.forEach(p => {
         if (!plansByCredit.has(p.creditId)) plansByCredit.set(p.creditId, []);
         plansByCredit.get(p.creditId)!.push(p);
