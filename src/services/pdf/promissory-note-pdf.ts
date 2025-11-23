@@ -46,23 +46,7 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
         
         // Función para cargar logo con fallback a base64
         const loadLogo = async (): Promise<void> => {
-            // En producción (serverless), usar logo embebido en base64
-            if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-                try {
-                    // Logo simple en base64 (pequeño logo CrediNica)
-                    const logoBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-                    const logoBytes = Buffer.from(logoBase64, 'base64');
-                    
-                    // Crear un logo simple programáticamente
-                    console.log('🔧 Usando logo programático para producción');
-                    return; // Usar el logo alternativo de formas geométricas
-                } catch (error) {
-                    console.log('❌ Error con logo base64, usando alternativo');
-                    return;
-                }
-            }
-            
-            // En desarrollo, intentar cargar desde archivos locales
+            // Intentar cargar desde archivos locales (funciona en desarrollo y producción)
             const possibleLogoPaths = [
                 path.join(process.cwd(), 'public', 'CrediNica.png'),
                 path.join(process.cwd(), 'public', 'CrediNica-inicial.png'),
@@ -75,16 +59,17 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
                     await fs.access(logoPath);
                     const logoBytes = await fs.readFile(logoPath);
                     logoImage = await pdfDoc.embedPng(logoBytes);
-                    logoDims = logoImage.scale(0.05);
+                    logoDims = logoImage.scale(0.15); // Aumentado de 0.05 a 0.15 para que se vea más grande
                     
                     console.log(`✅ Logo cargado exitosamente desde: ${logoPath}`);
                     return;
                 } catch (error) {
+                    console.log(`⚠️ No se pudo cargar logo desde: ${logoPath}`);
                     continue;
                 }
             }
             
-            console.warn('⚠️ Logo no encontrado, usando alternativo');
+            console.warn('⚠️ Logo no encontrado en ninguna ruta, usando alternativo');
         };
         
         await loadLogo();

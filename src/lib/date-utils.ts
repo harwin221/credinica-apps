@@ -261,3 +261,32 @@ export const isoToMySQLDateTimeStart = (isoString: string | any): string => {
         return '';
     }
 };
+
+/**
+ * Convierte una fecha ISO a formato DATETIME de MySQL con hora 12:00:00 (mediodía)
+ * Usar para fechas que representan "días completos" sin hora específica
+ * Ejemplos: firstPaymentDate, deliveryDate, dueDate, fechas del plan de pagos
+ */
+export const isoToMySQLDateTimeNoon = (isoString: string | any): string => {
+    if (!isoString) return '';
+    
+    try {
+        const dateString = typeof isoString === 'string' ? isoString : String(isoString);
+        if (!dateString || dateString === 'null' || dateString === 'undefined') {
+            return '';
+        }
+        
+        // Si solo es fecha (YYYY-MM-DD), agregar mediodía
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+            return `${dateString} 12:00:00`;
+        }
+        
+        // Si ya tiene hora, extraer solo la fecha y agregar mediodía
+        const date = parseISO(dateString);
+        if (!isValid(date)) return '';
+        return format(date, 'yyyy-MM-dd') + ' 12:00:00';
+    } catch (error) {
+        console.error('Error converting ISO to MySQL DateTime Noon:', error, 'Input:', isoString);
+        return '';
+    }
+};

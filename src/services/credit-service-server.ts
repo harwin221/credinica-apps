@@ -61,15 +61,18 @@ export async function addCredit(creditData: Partial<CreditApplication> & { deliv
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
+        // Importar la nueva función
+        const { isoToMySQLDateTimeNoon } = await import('@/lib/date-utils');
+        
         await query(creditSql, [
             newCreditId, creditNumber, clientId, clientName, initialStatus,
-            isoToMySQLDateTime(applicationDate),
-            approvalDate ? isoToMySQLDateTime(approvalDate) : null,
+            isoToMySQLDateTime(applicationDate), // Hora exacta de solicitud
+            approvalDate ? isoToMySQLDateTime(approvalDate) : null, // Hora exacta de aprobación
             approvedBy, amount, amount, interestRate, termMonths, paymentFrequency, 'CÓRDOBAS',
             scheduleData.totalPayment, scheduleData.totalInterest, scheduleData.periodicPayment,
-            isoToMySQLDateTime(firstPaymentDate),
-            deliveryDate ? isoToMySQLDateTime(deliveryDate) : null,
-            `${scheduleData.schedule[scheduleData.schedule.length - 1].paymentDate} 12:00:00`,
+            isoToMySQLDateTimeNoon(firstPaymentDate), // Mediodía - fecha sin hora específica
+            deliveryDate ? isoToMySQLDateTimeNoon(deliveryDate) : null, // Mediodía - fecha sin hora específica
+            `${scheduleData.schedule[scheduleData.schedule.length - 1].paymentDate} 12:00:00`, // Mediodía
             gestor.fullName, supervisorUser?.fullName || null, creator.fullName,
             gestor.sucursal || null, gestor.sucursalName || null, productType, subProduct, productDestination
         ]);
@@ -167,13 +170,18 @@ export async function updateCredit(id: string, creditData: Partial<CreditDetail>
             );
 
             // Convertir fechas a formato MySQL si existen
+            const { isoToMySQLDateTimeNoon } = await import('@/lib/date-utils');
+            
             if (filteredFields.deliveryDate && typeof filteredFields.deliveryDate === 'string') {
-                filteredFields.deliveryDate = isoToMySQLDateTime(filteredFields.deliveryDate);
+                // deliveryDate usa mediodía (fecha sin hora específica)
+                filteredFields.deliveryDate = isoToMySQLDateTimeNoon(filteredFields.deliveryDate);
             }
             if (filteredFields.firstPaymentDate && typeof filteredFields.firstPaymentDate === 'string') {
-                filteredFields.firstPaymentDate = isoToMySQLDateTime(filteredFields.firstPaymentDate);
+                // firstPaymentDate usa mediodía (fecha sin hora específica)
+                filteredFields.firstPaymentDate = isoToMySQLDateTimeNoon(filteredFields.firstPaymentDate);
             }
             if (filteredFields.approvalDate && typeof filteredFields.approvalDate === 'string') {
+                // approvalDate usa hora exacta (momento de aprobación)
                 filteredFields.approvalDate = isoToMySQLDateTime(filteredFields.approvalDate);
             }
             // lastModifiedDate se maneja automáticamente por updatedAt en la base de datos
