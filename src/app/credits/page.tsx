@@ -53,7 +53,7 @@ export default function CreditsPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [selectedStatus, setSelectedStatus] = React.useState<CreditStatus | 'all'>('all');
+  const [selectedStatus, setSelectedStatus] = React.useState<CreditStatus | 'all'>('Active'); // Por defecto: solo créditos activos
   const [selectedSucursal, setSelectedSucursal] = React.useState<string>('all');
   const [selectedGestor, setSelectedGestor] = React.useState<string>('all');
   
@@ -198,11 +198,12 @@ export default function CreditsPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">Todos los Estados</SelectItem>
-                        <SelectItem value="Active">Créditos Activos</SelectItem>
+                        <SelectItem value="Active">Activos</SelectItem>
                         <SelectItem value="Pending">Pendientes</SelectItem>
                         <SelectItem value="Approved">Aprobados</SelectItem>
                         <SelectItem value="Paid">Cancelados</SelectItem>
                         <SelectItem value="Rejected">Rechazados</SelectItem>
+                        <SelectItem value="Expired">Vencidos</SelectItem>
                         <SelectItem value="Fallecido">Fallecido</SelectItem>
                     </SelectContent>
                 </Select>
