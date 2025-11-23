@@ -411,6 +411,15 @@ export function CreditForm({ initialData }: CreditFormProps) {
                                           setSelectedClient(client);
                                           setComboboxOpen(false);
 
+                                          // Auto-select product type based on client employment type
+                                          if (client.employmentType === 'asalariado') {
+                                            setValue('productType', 'PERSONAL');
+                                            setValue('subProduct', 'CONSUMO');
+                                          } else if (client.employmentType === 'comerciante') {
+                                            setValue('productType', 'COMERCIAL');
+                                            setValue('subProduct', 'COMERCIO');
+                                          }
+
                                           // Handle client selection inline
                                           try {
                                             const clientCredits = await getClientCredits(client.id);

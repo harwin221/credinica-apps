@@ -295,8 +295,8 @@ export async function generateColocacionVsRecuperacionReport(filters: ReportFilt
 
     let recuperacionSql = `SELECT pr.managedBy, SUM(pr.amount) as total, MAX(pr.paymentDate) as lastDate FROM payments_registered pr WHERE pr.status != 'ANULADO'`;
     const recuperacionParams: any[] = [];
-    if (dateFrom) { recuperacionSql += ' AND DATE(pr.paymentDate) >= ?'; recuperacionParams.push(getReportDateStart(dateFrom)); }
-    if (dateTo) { recuperacionSql += ' AND DATE(pr.paymentDate) <= ?'; recuperacionParams.push(getReportDateEnd(dateTo)); }
+    if (dateFrom) { recuperacionSql += ' AND DATE(DATE_SUB(pr.paymentDate, INTERVAL 6 HOUR)) >= ?'; recuperacionParams.push(getReportDateStart(dateFrom)); }
+    if (dateTo) { recuperacionSql += ' AND DATE(DATE_SUB(pr.paymentDate, INTERVAL 6 HOUR)) <= ?'; recuperacionParams.push(getReportDateEnd(dateTo)); }
     recuperacionSql += ' GROUP BY pr.managedBy';
     const recuperacionRows: any[] = await query(recuperacionSql, recuperacionParams);
 
@@ -309,8 +309,8 @@ export async function generateColocacionVsRecuperacionReport(filters: ReportFilt
 
     let colocacionSql = `SELECT collectionsManager, SUM(principalAmount) as total, COUNT(id) as count FROM credits WHERE status IN ('Active', 'Paid')`;
     const colocacionParams: any[] = [];
-    if (dateFrom) { colocacionSql += ' AND DATE(deliveryDate) >= ?'; colocacionParams.push(getReportDateStart(dateFrom)); }
-    if (dateTo) { colocacionSql += ' AND DATE(deliveryDate) <= ?'; colocacionParams.push(getReportDateEnd(dateTo)); }
+    if (dateFrom) { colocacionSql += ' AND DATE(DATE_SUB(deliveryDate, INTERVAL 6 HOUR)) >= ?'; colocacionParams.push(getReportDateStart(dateFrom)); }
+    if (dateTo) { colocacionSql += ' AND DATE(DATE_SUB(deliveryDate, INTERVAL 6 HOUR)) <= ?'; colocacionParams.push(getReportDateEnd(dateTo)); }
     colocacionSql += ' GROUP BY collectionsManager';
     const colocacionRows: any[] = await query(colocacionSql, colocacionParams);
 
@@ -405,11 +405,11 @@ export async function generateNonRenewedReport(filters: ReportFilters): Promise<
     `;
     const params: any[] = [];
     if (filters.dateFrom) {
-        paidCreditsSql += ` AND DATE(pr.paymentDate) >= ?`;
+        paidCreditsSql += ` AND DATE(DATE_SUB(pr.paymentDate, INTERVAL 6 HOUR)) >= ?`;
         params.push(filters.dateFrom);
     }
     if (filters.dateTo) {
-        paidCreditsSql += ` AND DATE(pr.paymentDate) <= ?`;
+        paidCreditsSql += ` AND DATE(DATE_SUB(pr.paymentDate, INTERVAL 6 HOUR)) <= ?`;
         params.push(filters.dateTo);
     }
     paidCreditsSql += ` GROUP BY c.id`;
@@ -731,11 +731,11 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
     const params: any[] = [];
 
     if (filters.dateFrom) {
-        sql += ' AND DATE(c.deliveryDate) >= ?';
+        sql += ' AND DATE(DATE_SUB(c.deliveryDate, INTERVAL 6 HOUR)) >= ?';
         params.push(getReportDateStart(filters.dateFrom));
     }
     if (filters.dateTo) {
-        sql += ' AND DATE(c.deliveryDate) <= ?';
+        sql += ' AND DATE(DATE_SUB(c.deliveryDate, INTERVAL 6 HOUR)) <= ?';
         params.push(getReportDateEnd(filters.dateTo));
     }
 
@@ -794,8 +794,8 @@ export async function generatePaymentsDetailReport(filters: ReportFilters): Prom
     `;
     const params: any[] = [];
 
-    if (dateFrom) { sql += ` AND DATE(pr.paymentDate) >= ?`; params.push(dateFrom); }
-    if (dateTo) { sql += ` AND DATE(pr.paymentDate) <= ?`; params.push(dateTo); }
+    if (dateFrom) { sql += ` AND DATE(DATE_SUB(pr.paymentDate, INTERVAL 6 HOUR)) >= ?`; params.push(dateFrom); }
+    if (dateTo) { sql += ` AND DATE(DATE_SUB(pr.paymentDate, INTERVAL 6 HOUR)) <= ?`; params.push(dateTo); }
 
     sql += ' ORDER BY pr.paymentDate DESC LIMIT 1000'; // Limitar a 1000 registros para evitar sobrecarga
 

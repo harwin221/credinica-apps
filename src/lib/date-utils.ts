@@ -281,10 +281,13 @@ export const isoToMySQLDateTimeNoon = (isoString: string | any): string => {
             return `${dateString} 12:00:00`;
         }
         
-        // Si ya tiene hora, extraer solo la fecha y agregar mediodía
+        // Si ya tiene hora, convertir a zona horaria de Nicaragua primero
         const date = parseISO(dateString);
         if (!isValid(date)) return '';
-        return format(date, 'yyyy-MM-dd') + ' 12:00:00';
+        
+        // Convertir a zona horaria de Nicaragua y extraer solo la fecha
+        const nicaraguaDate = toZonedTime(date, NICARAGUA_TIMEZONE);
+        return format(nicaraguaDate, 'yyyy-MM-dd') + ' 12:00:00';
     } catch (error) {
         console.error('Error converting ISO to MySQL DateTime Noon:', error, 'Input:', isoString);
         return '';
