@@ -46,7 +46,7 @@ const DetailRow = ({ label, value }: { label: string, value?: string | number | 
 );
 
 
-export default function ConsolidatedStatementPage() {
+function ConsolidatedStatementContent() {
     const searchParams = useSearchParams();
     const [reportData, setReportData] = React.useState<ConsolidatedStatementData | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -76,15 +76,15 @@ export default function ConsolidatedStatementPage() {
             </div>
         );
     }
-    
+
     if (!reportData || reportData.credits.length === 0) {
-       return (
+        return (
             <div className="flex h-screen items-center justify-center p-4">
                 <div className="text-center text-muted-foreground">No se encontraron datos de créditos para este cliente.</div>
             </div>
-       );
+        );
     }
-    
+
     const { client, credits, creditCount, averageCreditAmount, globalAverageLateDays, economicActivity } = reportData;
 
     return (
@@ -102,8 +102,8 @@ export default function ConsolidatedStatementPage() {
                         <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir</Button>
                     </div>
                 </header>
-                
-                 <div className="grid grid-cols-3 gap-x-8 text-xs mb-4">
+
+                <div className="grid grid-cols-3 gap-x-8 text-xs mb-4">
                     <div className="space-y-1">
                         <DetailRow label="NOMBRE DEL CLIENTE:" value={client.name} />
                         <DetailRow label="CRÉDITO PROMEDIO:" value={formatCurrency(averageCreditAmount)} />
@@ -113,7 +113,7 @@ export default function ConsolidatedStatementPage() {
                         <DetailRow label="CÓDIGO DEL CLIENTE:" value={client.clientNumber} />
                         <DetailRow label="ACTIVIDAD ECONÓMICA:" value={economicActivity} />
                     </div>
-                     <div className="space-y-1">
+                    <div className="space-y-1">
                         <DetailRow label="PROMEDIO GLOBAL:" value={formatNumber(globalAverageLateDays)} />
                     </div>
                 </div>
@@ -157,5 +157,18 @@ export default function ConsolidatedStatementPage() {
 
             </div>
         </div>
+    );
+}
+
+export default function ConsolidatedStatementPage() {
+    return (
+        <React.Suspense fallback={
+            <div className="flex h-screen items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <p className="ml-2">Cargando reporte...</p>
+            </div>
+        }>
+            <ConsolidatedStatementContent />
+        </React.Suspense>
     );
 }
