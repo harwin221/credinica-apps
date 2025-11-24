@@ -45,18 +45,48 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
         let logoImage: any;
         let logoDims: any;
         
-        try {
-            const logoPath = path.join(process.cwd(), 'public', 'CrediNica.png');
-            console.log('🔍 Intentando cargar logo desde:', logoPath);
+        // Intentar múltiples rutas para encontrar el logo
+        const possiblePaths = [
+            path.join(process.cwd(), 'public', 'CrediNica.png'),
+            path.join(process.cwd(), 'public', 'credinica.png'), // lowercase
+            path.join(process.cwd(), '.next', 'static', 'media', 'CrediNica.png'),
+            './public/CrediNica.png',
+            '/var/task/public/CrediNica.png', // Vercel serverless
+        ];
+        
+        let logoLoaded = false;
+        let lastError: any = null;
+        
+        for (const logoPath of possiblePaths) {
+            try {
+                console.log('🔍 Intentando cargar logo desde:', logoPath);
+                const logoBytes = await fs.readFile(logoPath);
+                logoImage = await pdfDoc.embedPng(logoBytes);
+                logoDims = logoImage.scale(0.2);
+                console.log('✅ Logo cargado exitosamente desde:', logoPath);
+                logoLoaded = true;
+                break;
+            } catch (error) {
+                lastError = error;
+                console.log('⚠️ No encontrado en:', logoPath);
+                continue;
+            }
+        }
+        
+        if (!logoLoaded) {
+            console.error('❌ ERROR: Logo no encontrado en ninguna ruta');
+            console.error('Último error:', lastError);
+            console.error('CWD:', process.cwd());
             
-            const logoBytes = await fs.readFile(logoPath);
-            logoImage = await pdfDoc.embedPng(logoBytes);
-            logoDims = logoImage.scale(0.2); // Tamaño del logo
+            // Listar archivos en public para debug
+            try {
+                const publicFiles = await fs.readdir(path.join(process.cwd(), 'public'));
+                console.log('📁 Archivos en public/:', publicFiles);
+            } catch (e) {
+                console.log('No se pudo listar public/');
+            }
             
-            console.log('✅ Logo CrediNica.png cargado exitosamente');
-        } catch (error) {
-            console.error('❌ ERROR: No se pudo cargar CrediNica.png desde public/', error);
-            throw new Error('Logo CrediNica.png no encontrado en la carpeta public/. Por favor, asegúrate de que el archivo existe.');
+            throw new Error('Logo CrediNica.png no encontrado. Verifica que el archivo existe en la carpeta public/');
         }
 
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
