@@ -13,21 +13,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCedula(value: string): string {
-    if (!value) return '';
-    const cleaned = value.replace(/[^0-9A-Z]/gi, '').toUpperCase();
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 9) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
-    if (cleaned.length <= 13) return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 9)}-${cleaned.slice(9)}`;
-    return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 9)}-${cleaned.slice(9, 13)}${cleaned.slice(13, 14)}`;
+  if (!value) return '';
+  const cleaned = value.replace(/[^0-9A-Z]/gi, '').toUpperCase();
+  if (cleaned.length <= 3) return cleaned;
+  if (cleaned.length <= 9) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+  if (cleaned.length <= 13) return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 9)}-${cleaned.slice(9)}`;
+  return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 9)}-${cleaned.slice(9, 13)}${cleaned.slice(13, 14)}`;
 }
 
 export function formatPhone(value: string): string {
-    if (!value) return '';
-    const cleaned = value.replace(/\D/g, ''); // Remover todos los caracteres no numéricos
-    if (cleaned.length <= 4) {
-        return cleaned;
-    }
-    return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 8)}`;
+  if (!value) return '';
+  const cleaned = value.replace(/\D/g, ''); // Remover todos los caracteres no numéricos
+  if (cleaned.length <= 4) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 8)}`;
 }
 
 export function formatCedulaForPagare(cedula: string): string {
@@ -56,18 +56,18 @@ export const decodeData = (encodedData: string): string => {
       // Lado del cliente
       return window.atob(encodedData);
     }
-     else {
+    else {
       // Lado del servidor
       return Buffer.from(encodedData, 'base64').toString('utf-8');
     }
   } catch (e) {
-      // Fallback: Si la decodificación falla, es probable que el dato ya esté en texto plano.
-      return encodedData;
+    // Fallback: Si la decodificación falla, es probable que el dato ya esté en texto plano.
+    return encodedData;
   }
 };
 
 export const normalizeString = (str: string = ''): string => {
-    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 };
 
 /**
@@ -85,100 +85,100 @@ export const normalizeString = (str: string = ''): string => {
  * @returns El objeto Date ajustado.
  */
 export const adjustToNextBusinessDay = (date: Date, frequency: PaymentFrequency, holidays: string[] = []): Date => {
-    let newDate = new Date(date.getTime());
+  let newDate = new Date(date.getTime());
 
-    const isHoliday = (d: Date) => {
-        const dateString = format(d, 'yyyy-MM-dd');
-        return holidays.includes(dateString);
-    };
+  const isHoliday = (d: Date) => {
+    const dateString = format(d, 'yyyy-MM-dd');
+    return holidays.includes(dateString);
+  };
 
-    let adjusted = true;
-    let iterations = 0;
-    const MAX_ITERATIONS = 30; // Prevenir bucles infinitos
-    
-    while(adjusted && iterations < MAX_ITERATIONS) {
-        adjusted = false;
-        iterations++;
-        const dayOfWeek = newDate.getDay(); // 0 = Domingo, 6 = Sábado
+  let adjusted = true;
+  let iterations = 0;
+  const MAX_ITERATIONS = 30; // Prevenir bucles infinitos
 
-        // PASO 1: Verificar Domingo (aplica a TODOS los tipos de crédito)
-        if (dayOfWeek === 0) {
-            newDate = addDays(newDate, 1); // Mover a lunes
-            adjusted = true;
-            continue;
-        }
+  while (adjusted && iterations < MAX_ITERATIONS) {
+    adjusted = false;
+    iterations++;
+    const dayOfWeek = newDate.getDay(); // 0 = Domingo, 6 = Sábado
 
-        // PASO 2: Verificar Sábado (reglas específicas por tipo de crédito)
-        if (dayOfWeek === 6) {
-            if (frequency === 'Diario') {
-                // Diarios: NO permiten sábado, saltar a lunes
-                newDate = addDays(newDate, 2);
-                adjusted = true;
-                continue;
-            } else if (frequency === 'Catorcenal') {
-                // Catorcenales: NO permiten sábado (solo L-V), saltar a lunes
-                newDate = addDays(newDate, 2);
-                adjusted = true;
-                continue;
-            }
-            // Semanal y Quincenal: SÍ permiten sábado, continuar a verificar feriado
-        }
-
-        // PASO 3: Verificar si es feriado
-        if (isHoliday(newDate)) {
-            const currentDayOfWeek = newDate.getDay();
-            
-            if (frequency === 'Diario') {
-                // Diarios: Feriado → siguiente día hábil (lunes si es viernes)
-                newDate = addDays(newDate, 1);
-                adjusted = true;
-                continue;
-            } else if (frequency === 'Semanal') {
-                // Semanales: Feriado viernes → sábado, feriado sábado → lunes
-                if (currentDayOfWeek === 5) { // Viernes feriado
-                    newDate = addDays(newDate, 1); // Ir a sábado
-                } else if (currentDayOfWeek === 6) { // Sábado feriado
-                    newDate = addDays(newDate, 2); // Ir a lunes
-                } else {
-                    newDate = addDays(newDate, 1); // Siguiente día
-                }
-                adjusted = true;
-                continue;
-            } else if (frequency === 'Catorcenal') {
-                // Catorcenales: Feriado viernes → sábado, feriado sábado → lunes
-                if (currentDayOfWeek === 5) { // Viernes feriado
-                    newDate = addDays(newDate, 1); // Ir a sábado
-                } else if (currentDayOfWeek === 6) { // Sábado feriado
-                    newDate = addDays(newDate, 2); // Ir a lunes
-                } else {
-                    newDate = addDays(newDate, 1); // Siguiente día
-                }
-                adjusted = true;
-                continue;
-            } else if (frequency === 'Quincenal') {
-                // Quincenales: Feriado viernes → sábado, feriado sábado → lunes
-                if (currentDayOfWeek === 5) { // Viernes feriado
-                    newDate = addDays(newDate, 1); // Ir a sábado
-                } else if (currentDayOfWeek === 6) { // Sábado feriado
-                    newDate = addDays(newDate, 2); // Ir a lunes
-                } else {
-                    newDate = addDays(newDate, 1); // Siguiente día
-                }
-                adjusted = true;
-                continue;
-            }
-        }
+    // PASO 1: Verificar Domingo (aplica a TODOS los tipos de crédito)
+    if (dayOfWeek === 0) {
+      newDate = addDays(newDate, 1); // Mover a lunes
+      adjusted = true;
+      continue;
     }
-    
-    if (iterations >= MAX_ITERATIONS) {
-        console.error('adjustToNextBusinessDay: Se alcanzó el máximo de iteraciones', {
-            originalDate: format(date, 'yyyy-MM-dd'),
-            frequency,
-            holidays: holidays.length
-        });
+
+    // PASO 2: Verificar Sábado (reglas específicas por tipo de crédito)
+    if (dayOfWeek === 6) {
+      if (frequency === 'Diario') {
+        // Diarios: NO permiten sábado, saltar a lunes
+        newDate = addDays(newDate, 2);
+        adjusted = true;
+        continue;
+      } else if (frequency === 'Catorcenal') {
+        // Catorcenales: NO permiten sábado (solo L-V), saltar a lunes
+        newDate = addDays(newDate, 2);
+        adjusted = true;
+        continue;
+      }
+      // Semanal y Quincenal: SÍ permiten sábado, continuar a verificar feriado
     }
-    
-    return newDate;
+
+    // PASO 3: Verificar si es feriado
+    if (isHoliday(newDate)) {
+      const currentDayOfWeek = newDate.getDay();
+
+      if (frequency === 'Diario') {
+        // Diarios: Feriado → siguiente día hábil (lunes si es viernes)
+        newDate = addDays(newDate, 1);
+        adjusted = true;
+        continue;
+      } else if (frequency === 'Semanal') {
+        // Semanales: Feriado viernes → sábado, feriado sábado → lunes
+        if (currentDayOfWeek === 5) { // Viernes feriado
+          newDate = addDays(newDate, 1); // Ir a sábado
+        } else if (currentDayOfWeek === 6) { // Sábado feriado
+          newDate = addDays(newDate, 2); // Ir a lunes
+        } else {
+          newDate = addDays(newDate, 1); // Siguiente día
+        }
+        adjusted = true;
+        continue;
+      } else if (frequency === 'Catorcenal') {
+        // Catorcenales: Feriado viernes → sábado, feriado sábado → lunes
+        if (currentDayOfWeek === 5) { // Viernes feriado
+          newDate = addDays(newDate, 1); // Ir a sábado
+        } else if (currentDayOfWeek === 6) { // Sábado feriado
+          newDate = addDays(newDate, 2); // Ir a lunes
+        } else {
+          newDate = addDays(newDate, 1); // Siguiente día
+        }
+        adjusted = true;
+        continue;
+      } else if (frequency === 'Quincenal') {
+        // Quincenales: Feriado viernes → sábado, feriado sábado → lunes
+        if (currentDayOfWeek === 5) { // Viernes feriado
+          newDate = addDays(newDate, 1); // Ir a sábado
+        } else if (currentDayOfWeek === 6) { // Sábado feriado
+          newDate = addDays(newDate, 2); // Ir a lunes
+        } else {
+          newDate = addDays(newDate, 1); // Siguiente día
+        }
+        adjusted = true;
+        continue;
+      }
+    }
+  }
+
+  if (iterations >= MAX_ITERATIONS) {
+    console.error('adjustToNextBusinessDay: Se alcanzó el máximo de iteraciones', {
+      originalDate: format(date, 'yyyy-MM-dd'),
+      frequency,
+      holidays: holidays.length
+    });
+  }
+
+  return newDate;
 };
 
 
@@ -203,7 +203,7 @@ export function generatePaymentSchedule(data: PaymentScheduleArgs): CalculatedPa
       // Si es solo fecha (YYYY-MM-DD), parsear correctamente
       initialDate = parseISO(`${dateInput}T00:00:00`);
     }
-    
+
     if (isNaN(initialDate.getTime())) return null;
   } catch (error) {
     console.error('Error parsing date in generatePaymentSchedule:', error);
@@ -211,7 +211,7 @@ export function generatePaymentSchedule(data: PaymentScheduleArgs): CalculatedPa
   }
 
   let numberOfPayments: number;
-  
+
   switch (paymentFrequency) {
     case 'Diario': numberOfPayments = Math.round(termMonths * 20); break;
     case 'Semanal': numberOfPayments = Math.round(termMonths * 4); break;
@@ -225,64 +225,36 @@ export function generatePaymentSchedule(data: PaymentScheduleArgs): CalculatedPa
   const totalInterest = loanAmount * (monthlyInterestRate / 100) * termMonths;
   const totalPayment = loanAmount + totalInterest;
   const periodicPayment = totalPayment / numberOfPayments;
-  
+
   const periodicInterest = totalInterest / numberOfPayments;
   const periodicPrincipal = loanAmount / numberOfPayments;
 
   const schedule: Payment[] = [];
   let remainingBalance = totalPayment;
-  
+
   // --- LÓGICA DE CÁLCULO REESTRUCTURADA ---
   let theoreticalDate = initialDate;
   let extensionDays = 0; // Para créditos diarios
-  
-  // Para quincenales, determinar si es día 2 o 17
-  let quincenalDay: 2 | 17 | null = null;
-  if (paymentFrequency === 'Quincenal') {
-    const startDay = initialDate.getDate();
-    // Si la fecha inicial es entre 1-9, usar día 2
-    // Si es entre 10-31, usar día 17
-    quincenalDay = startDay <= 9 ? 2 : 17;
-  }
+
+
 
   for (let i = 1; i <= numberOfPayments; i++) {
     let adjustedDate: Date;
-    
-    // Lógica especial para quincenales (días 2 y 17)
-    if (paymentFrequency === 'Quincenal' && quincenalDay) {
-      // Calcular en qué mes cae esta cuota
-      const monthsToAdd = Math.floor((i - 1) / 2);
-      const targetMonth = addMonths(initialDate, monthsToAdd);
-      
-      // Determinar si es día 2 o 17
-      const isFirstPaymentOfMonth = (i % 2 === 1);
-      const targetDay = isFirstPaymentOfMonth ? quincenalDay : (quincenalDay === 2 ? 17 : 2);
-      
-      // Asegurar que no caiga en día 31 (usar el último día del mes si es menor)
-      const daysInTargetMonth = getDaysInMonth(targetMonth);
-      const safeDay = Math.min(targetDay, daysInTargetMonth);
-      
-      // Crear la fecha teórica
-      theoreticalDate = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), safeDay);
-      
-      // Ajustar si cae en domingo o feriado
-      adjustedDate = adjustToNextBusinessDay(theoreticalDate, paymentFrequency, holidays);
-    } else {
-      // Lógica normal para otros tipos de crédito
-      // 1. Ajusta la fecha TEÓRICA para esta cuota específica
-      adjustedDate = adjustToNextBusinessDay(theoreticalDate, paymentFrequency, holidays);
 
-      // Si es crédito diario y el ajuste causó un salto de días, se cuenta para extender el vencimiento.
-      if(paymentFrequency === 'Diario') {
-        const daysDiff = differenceInDays(adjustedDate, theoreticalDate);
-        if(daysDiff > 0) {
-          extensionDays += daysDiff;
-        }
+    // Lógica normal para todos los tipos de crédito
+    // 1. Ajusta la fecha TEÓRICA para esta cuota específica
+    adjustedDate = adjustToNextBusinessDay(theoreticalDate, paymentFrequency, holidays);
+
+    // Si es crédito diario y el ajuste causó un salto de días, se cuenta para extender el vencimiento.
+    if (paymentFrequency === 'Diario') {
+      const daysDiff = differenceInDays(adjustedDate, theoreticalDate);
+      if (daysDiff > 0) {
+        extensionDays += daysDiff;
       }
     }
-    
+
     remainingBalance -= periodicPayment;
-    
+
     schedule.push({
       id: `payment_${i}`,
       creditId: 'calc',
@@ -294,11 +266,62 @@ export function generatePaymentSchedule(data: PaymentScheduleArgs): CalculatedPa
       balance: Math.max(0, remainingBalance),
     });
 
-    // 2. Avanza la fecha TEÓRICA para la siguiente iteración (solo para no-quincenales)
-    if (paymentFrequency !== 'Quincenal') {
+    // 2. Avanza la fecha TEÓRICA para la siguiente iteración
+    if (paymentFrequency === 'Quincenal') {
+      // Lógica Semimensual (Quincenal) basada en anclajes para evitar deriva
+      const startDay = initialDate.getDate();
+      const isStartSecondHalf = startDay > 15;
+
+      // Definir los dos días de pago base
+      // Si inicia el 5 -> días 5 y 20
+      // Si inicia el 20 -> días 5 y 20
+      const day1 = isStartSecondHalf ? startDay - 15 : startDay;
+      const day2 = isStartSecondHalf ? startDay : startDay + 15;
+
+      // Calcular el índice lógico de la SIGUIENTE cuota (i es el índice actual 1-based, queremos el siguiente i+1)
+      // Pero aquí estamos actualizando 'theoreticalDate' para la *siguiente* iteración del bucle.
+      // En la siguiente iteración, 'i' será i+1.
+      // La lógica dentro del bucle usa 'theoreticalDate' directamente.
+      // Así que calculamos la fecha para la cuota i+1.
+
+      const nextPaymentIndex = i; // 0-based index for the next item (which is i in 1-based)
+      // Ajuste: 'i' aquí es el número de pago que ACABA de procesarse (1, 2, 3...).
+      // Queremos calcular la fecha para el pago i+1.
+
+      // Offset de meses desde la fecha inicial
+      // Si arrancamos en la 2da quincena (isStartSecondHalf=true), el pago 1 es la 2da del mes 0.
+      // El pago 2 (i=1 para el próximo loop) será la 1ra del mes 1.
+      // El pago 3 (i=2 para el próximo loop) será la 2da del mes 1.
+
+      const baseIndex = nextPaymentIndex + (isStartSecondHalf ? 1 : 0);
+      const monthOffset = Math.floor(baseIndex / 2);
+      const isTargetSecondHalf = (baseIndex % 2) === 1;
+
+      const targetYear = initialDate.getFullYear();
+      const targetMonthIndex = initialDate.getMonth() + monthOffset;
+      const targetDay = isTargetSecondHalf ? day2 : day1;
+
+      // Crear fecha y manejar desbordamiento de mes (ej: Feb 30 -> Feb 28)
+      theoreticalDate = new Date(targetYear, targetMonthIndex, targetDay);
+
+      // Verificar si hubo desbordamiento (ej: pedimos día 30 pero cayó en el mes siguiente)
+      // El objeto Date ajusta automáticamente 2023-02-30 a 2023-03-02.
+      // Queremos detectar esto y retroceder al último día del mes correcto.
+      const expectedMonth = targetMonthIndex % 12; // 0-11
+      const actualMonth = theoreticalDate.getMonth();
+
+      // Ajuste para años negativos o desbordamientos grandes (aunque monthOffset es positivo)
+      const normalizedExpectedMonth = (expectedMonth + 12) % 12;
+
+      if (actualMonth !== normalizedExpectedMonth) {
+        // Hubo desbordamiento, fijar al último día del mes anterior (el mes objetivo)
+        theoreticalDate = new Date(targetYear, targetMonthIndex + 1, 0);
+      }
+
+    } else {
+      // Lógica para otras frecuencias
       switch (paymentFrequency) {
         case 'Diario':
-          // Siempre avanza al siguiente día hábil desde la fecha ajustada anterior para mantener la secuencia
           theoreticalDate = adjustToNextBusinessDay(addDays(adjustedDate, 1), 'Diario', holidays);
           break;
         case 'Semanal':
@@ -312,15 +335,15 @@ export function generatePaymentSchedule(data: PaymentScheduleArgs): CalculatedPa
   }
 
   // Si es diario y hubo extensiones, ajusta la fecha de la última cuota.
-  if(paymentFrequency === 'Diario' && extensionDays > 0) {
-      const lastPayment = schedule[schedule.length-1];
-      if(lastPayment) {
-          let finalDate = parseISO(lastPayment.paymentDate);
-          for(let i=0; i<extensionDays; i++){
-              finalDate = adjustToNextBusinessDay(addDays(finalDate, 1), 'Diario', holidays);
-          }
-          lastPayment.paymentDate = format(finalDate, 'yyyy-MM-dd');
+  if (paymentFrequency === 'Diario' && extensionDays > 0) {
+    const lastPayment = schedule[schedule.length - 1];
+    if (lastPayment) {
+      let finalDate = parseISO(lastPayment.paymentDate);
+      for (let i = 0; i < extensionDays; i++) {
+        finalDate = adjustToNextBusinessDay(addDays(finalDate, 1), 'Diario', holidays);
       }
+      lastPayment.paymentDate = format(finalDate, 'yyyy-MM-dd');
+    }
   }
 
   return {
@@ -348,102 +371,102 @@ export function generateReceiptText(
   copyType: 'CLIENTE' | 'CONTROL INTERNO',
   isReprint: boolean = false
 ): string {
-    const TOTAL_WIDTH = 42;
+  const TOTAL_WIDTH = 42;
 
-    // --- Funciones de Ayuda ---
-    const sanitize = (text: string = ''): string => {
-        if (!text) return '';
-        return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-    };
+  // --- Funciones de Ayuda ---
+  const sanitize = (text: string = ''): string => {
+    if (!text) return '';
+    return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  };
 
-    const formatCurrencyNoSymbol = (amount: number): string => {
-        if (isNaN(amount)) return '0.00';
-        return amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    };
+  const formatCurrencyNoSymbol = (amount: number): string => {
+    if (isNaN(amount)) return '0.00';
+    return amount.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
-    const center = (text: string): string => {
-        if (text.length >= TOTAL_WIDTH) return text.substring(0, TOTAL_WIDTH);
-        const padding = Math.floor((TOTAL_WIDTH - text.length) / 2);
-        return ' '.repeat(Math.max(0, padding)) + text;
-    };
+  const center = (text: string): string => {
+    if (text.length >= TOTAL_WIDTH) return text.substring(0, TOTAL_WIDTH);
+    const padding = Math.floor((TOTAL_WIDTH - text.length) / 2);
+    return ' '.repeat(Math.max(0, padding)) + text;
+  };
 
-    const alignLeftRight = (left: string, right: string): string => {
-        const padding = ' '.repeat(Math.max(1, TOTAL_WIDTH - left.length - right.length));
-        return left + padding + right;
-    };
-    
-    const lineSeparator = '-'.repeat(TOTAL_WIDTH);
+  const alignLeftRight = (left: string, right: string): string => {
+    const padding = ' '.repeat(Math.max(1, TOTAL_WIDTH - left.length - right.length));
+    return left + padding + right;
+  };
 
-    // --- Cálculo de Datos ---
-    const paymentsBeforeCurrent = (credit.registeredPayments || []).filter(p => p.id !== payment.id);
-    const creditStateBefore = { ...credit, registeredPayments: paymentsBeforeCurrent };
-    
-    const statusBeforePayment = calculateCreditStatusDetails(creditStateBefore);
-    const statusAfterPayment = calculateCreditStatusDetails(credit);
+  const lineSeparator = '-'.repeat(TOTAL_WIDTH);
 
-    const cuotaDelDia = statusBeforePayment.dueTodayAmount || 0;
-    const montoAtrasado = statusBeforePayment.overdueAmount;
-    const diasMora = statusBeforePayment.lateDays;
-    const totalAPagar = cuotaDelDia + montoAtrasado;
-    const saldoAnterior = statusBeforePayment.remainingBalance;
-    const totalCobrado = payment.amount;
-    const nuevoSaldo = statusAfterPayment.remainingBalance;
-    const sucursalName = (credit.branchName || 'Sucursal').split(' ')[0].toUpperCase();
+  // --- Cálculo de Datos ---
+  const paymentsBeforeCurrent = (credit.registeredPayments || []).filter(p => p.id !== payment.id);
+  const creditStateBefore = { ...credit, registeredPayments: paymentsBeforeCurrent };
 
-    // --- Ensamblaje del Recibo ---
-    const lines = [];
+  const statusBeforePayment = calculateCreditStatusDetails(creditStateBefore);
+  const statusAfterPayment = calculateCreditStatusDetails(credit);
 
-    if (isReprint) {
-        lines.push(center('*** REIMPRESION ***'));
-        lines.push('');
-    }
-    
-    lines.push(center('CrediNica'));
-    lines.push(center(`COPIA: ${copyType}`));
-    lines.push(lineSeparator);
-    lines.push(`Recibo: ${payment.transactionNumber}`);
-    lines.push(`Credito: ${credit.creditNumber}`);
-    lines.push(`Fecha/Hora: ${formatDate(payment.paymentDate, 'dd/MM/yyyy HH:mm:ss')}`);
-    lines.push(`Transaccion: ${payment.transactionNumber}`);
-    lines.push(lineSeparator);
+  const cuotaDelDia = statusBeforePayment.dueTodayAmount || 0;
+  const montoAtrasado = statusBeforePayment.overdueAmount;
+  const diasMora = statusBeforePayment.lateDays;
+  const totalAPagar = cuotaDelDia + montoAtrasado;
+  const saldoAnterior = statusBeforePayment.remainingBalance;
+  const totalCobrado = payment.amount;
+  const nuevoSaldo = statusAfterPayment.remainingBalance;
+  const sucursalName = (credit.branchName || 'Sucursal').split(' ')[0].toUpperCase();
 
-    lines.push('Cliente:');
-    lines.push(sanitize(credit.clientName));
-    lines.push(credit.clientDetails?.clientNumber || 'N/A');
-    lines.push(lineSeparator);
+  // --- Ensamblaje del Recibo ---
+  const lines = [];
 
-    lines.push(alignLeftRight('Cuota del dia:', formatCurrencyNoSymbol(cuotaDelDia)));
-    lines.push(alignLeftRight('Monto atrasado:', formatCurrencyNoSymbol(montoAtrasado)));
-    lines.push(alignLeftRight('Dias mora:', diasMora.toString()));
-    lines.push(alignLeftRight('Total a pagar:', formatCurrencyNoSymbol(totalAPagar)));
-    lines.push(lineSeparator);
-    
-    lines.push(alignLeftRight('Monto de cancelacion:', formatCurrencyNoSymbol(saldoAnterior)));
-    lines.push(lineSeparator);
-    lines.push(alignLeftRight('Total cobrado:', formatCurrencyNoSymbol(totalCobrado)));
-    lines.push(lineSeparator);
-    
-    lines.push('Concepto:');
-    lines.push('ABONO DE CREDITO');
-    lines.push(alignLeftRight('Saldo anterior:', formatCurrencyNoSymbol(saldoAnterior)));
-    lines.push(alignLeftRight('Nuevo saldo:', formatCurrencyNoSymbol(nuevoSaldo)));
-    lines.push(lineSeparator);
-    
+  if (isReprint) {
+    lines.push(center('*** REIMPRESION ***'));
     lines.push('');
-    lines.push('');
-    lines.push(center(sanitize(sucursalName)));
-    lines.push('');
-    lines.push(center(sanitize(payment.managedBy)));
-    lines.push(center('GESTOR DE COBRO'));
-    lines.push('');
+  }
 
-    if (isReprint) {
-        lines.push(center('*** REIMPRESION ***'));
-    }
+  lines.push(center('CrediNica'));
+  lines.push(center(`COPIA: ${copyType}`));
+  lines.push(lineSeparator);
+  lines.push(`Recibo: ${payment.transactionNumber}`);
+  lines.push(`Credito: ${credit.creditNumber}`);
+  lines.push(`Fecha/Hora: ${formatDate(payment.paymentDate, 'dd/MM/yyyy HH:mm:ss')}`);
+  lines.push(`Transaccion: ${payment.transactionNumber}`);
+  lines.push(lineSeparator);
 
-    lines.push('\n\n\n'); 
+  lines.push('Cliente:');
+  lines.push(sanitize(credit.clientName));
+  lines.push(credit.clientDetails?.clientNumber || 'N/A');
+  lines.push(lineSeparator);
 
-    return lines.join('\n');
+  lines.push(alignLeftRight('Cuota del dia:', formatCurrencyNoSymbol(cuotaDelDia)));
+  lines.push(alignLeftRight('Monto atrasado:', formatCurrencyNoSymbol(montoAtrasado)));
+  lines.push(alignLeftRight('Dias mora:', diasMora.toString()));
+  lines.push(alignLeftRight('Total a pagar:', formatCurrencyNoSymbol(totalAPagar)));
+  lines.push(lineSeparator);
+
+  lines.push(alignLeftRight('Monto de cancelacion:', formatCurrencyNoSymbol(saldoAnterior)));
+  lines.push(lineSeparator);
+  lines.push(alignLeftRight('Total cobrado:', formatCurrencyNoSymbol(totalCobrado)));
+  lines.push(lineSeparator);
+
+  lines.push('Concepto:');
+  lines.push('ABONO DE CREDITO');
+  lines.push(alignLeftRight('Saldo anterior:', formatCurrencyNoSymbol(saldoAnterior)));
+  lines.push(alignLeftRight('Nuevo saldo:', formatCurrencyNoSymbol(nuevoSaldo)));
+  lines.push(lineSeparator);
+
+  lines.push('');
+  lines.push('');
+  lines.push(center(sanitize(sucursalName)));
+  lines.push('');
+  lines.push(center(sanitize(payment.managedBy)));
+  lines.push(center('GESTOR DE COBRO'));
+  lines.push('');
+
+  if (isReprint) {
+    lines.push(center('*** REIMPRESION ***'));
+  }
+
+  lines.push('\n\n\n');
+
+  return lines.join('\n');
 }
 
 export const PROVISION_RULES = {
@@ -466,160 +489,160 @@ export const getProvisionCategory = (lateDays: number): { category: ProvisionBuc
 };
 
 export const getRiskCategoryVariant = (category?: string) => {
-    switch (category) {
-        case 'A': return 'success';
-        case 'B': case 'C': return 'warning';
-        case 'D': case 'E': return 'destructive';
-        default: return 'secondary';
-    }
+  switch (category) {
+    case 'A': return 'success';
+    case 'B': case 'C': return 'warning';
+    case 'D': case 'E': return 'destructive';
+    default: return 'secondary';
+  }
 };
 
 const toISOStringSafe = (date: any): string | undefined => {
-    return toISOString(date) || undefined;
+  return toISOString(date) || undefined;
 };
 
 export function calculateCreditStatusDetails(credit: CreditDetail, asOfDateStr?: string | Date): CreditStatusDetails {
-    const defaultReturn: CreditStatusDetails = {
-        remainingBalance: 0,
-        overdueAmount: 0,
-        lateDays: 0,
-        currentLateFee: 0,
-        paidToday: 0,
-        isExpired: false,
-        isDueToday: false,
-        lastPaymentDate: undefined,
-        firstUnpaidDate: undefined,
-        conamiCategory: getProvisionCategory(0).category,
-        totalInstallmentAmount: credit.totalInstallmentAmount,
-        dueTodayAmount: 0
-    };
+  const defaultReturn: CreditStatusDetails = {
+    remainingBalance: 0,
+    overdueAmount: 0,
+    lateDays: 0,
+    currentLateFee: 0,
+    paidToday: 0,
+    isExpired: false,
+    isDueToday: false,
+    lastPaymentDate: undefined,
+    firstUnpaidDate: undefined,
+    conamiCategory: getProvisionCategory(0).category,
+    totalInstallmentAmount: credit.totalInstallmentAmount,
+    dueTodayAmount: 0
+  };
 
-    if (!credit || credit.status === 'Rejected' || credit.status === 'Pending' || credit.status === 'Fallecido') {
-      return defaultReturn;
-    }
+  if (!credit || credit.status === 'Rejected' || credit.status === 'Pending' || credit.status === 'Fallecido') {
+    return defaultReturn;
+  }
 
-    // Ensure paymentPlan and registeredPayments are arrays
-    const paymentPlan = Array.isArray(credit.paymentPlan) ? credit.paymentPlan : [];
-    const registeredPayments = Array.isArray(credit.registeredPayments) ? credit.registeredPayments : [];
+  // Ensure paymentPlan and registeredPayments are arrays
+  const paymentPlan = Array.isArray(credit.paymentPlan) ? credit.paymentPlan : [];
+  const registeredPayments = Array.isArray(credit.registeredPayments) ? credit.registeredPayments : [];
 
-    const sortedValidPayments = [...registeredPayments]
-        .filter(p => p.status !== 'ANULADO' && toISOStringSafe(p.paymentDate))
-        .sort((a,b) => parseISO(toISOStringSafe(b.paymentDate)!).getTime() - parseISO(toISOStringSafe(a.paymentDate)!).getTime());
-    
-    if (credit.status === 'Paid') {
-        const lastPayment = sortedValidPayments[0];
-        if (lastPayment?.paymentDate) {
-            defaultReturn.lastPaymentDate = toISOStringSafe(lastPayment.paymentDate)!;
-        }
-        return defaultReturn;
-    }
-    
-    // Continuar para créditos Activos
-    let asOfDate: Date;
-    if (asOfDateStr) {
-        if (typeof asOfDateStr === 'string') {
-            asOfDate = startOfDay(parseISO(asOfDateStr));
-        } else {
-            asOfDate = startOfDay(asOfDateStr);
-        }
-    } else {
-        asOfDate = startOfDay(parseISO(nowInNicaragua()));
-    }
+  const sortedValidPayments = [...registeredPayments]
+    .filter(p => p.status !== 'ANULADO' && toISOStringSafe(p.paymentDate))
+    .sort((a, b) => parseISO(toISOStringSafe(b.paymentDate)!).getTime() - parseISO(toISOStringSafe(a.paymentDate)!).getTime());
 
-    const totalToPay = credit.totalAmount || 0;
-    const validPayments = registeredPayments.filter(p => p.status !== 'ANULADO');
-    const totalPaid = validPayments.reduce((sum, p) => sum + p.amount, 0);
-
-    let remainingBalance = Math.max(0, totalToPay - totalPaid);
-
-    if (remainingBalance < 0.01) {
-        const lastPayment = sortedValidPayments[0];
-        if (lastPayment?.paymentDate) {
-            defaultReturn.lastPaymentDate = toISOStringSafe(lastPayment.paymentDate)!;
-        }
-        defaultReturn.remainingBalance = 0;
-        return defaultReturn;
-    }
-
-    // --- LÓGICA DE FECHAS REFACTORIZADA PARA EVITAR ERRORES DE ZONA HORARIA ---
-    const asOfDateString = asOfDateStr ? formatDateForUser(asOfDateStr, 'yyyy-MM-dd') : todayInNicaragua();
-
-    const paidToday = validPayments
-        .filter(p => {
-             const paymentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
-             return paymentDateString === asOfDateString;
-        })
-        .reduce((sum, p) => sum + p.amount, 0);
-
+  if (credit.status === 'Paid') {
     const lastPayment = sortedValidPayments[0];
-    const safeDueDate = toISOStringSafe(credit.dueDate);
-    const isExpired = safeDueDate ? isBefore(parseISO(safeDueDate), asOfDate) : false;
-
-    const installmentsDueBeforeToday = paymentPlan
-      .filter(p => {
-          const installmentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
-          return installmentDateString && installmentDateString < asOfDateString;
-      });
-
-    const amountDueBeforeToday = installmentsDueBeforeToday.reduce((sum, p) => sum + p.amount, 0);
-
-    const totalPaidBeforeToday = validPayments
-      .filter(p => {
-          const paymentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
-          return paymentDateString && paymentDateString < asOfDateString;
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    const surplusFromPast = Math.max(0, totalPaidBeforeToday - amountDueBeforeToday);
-    
-    let overdueAmount = Math.max(0, amountDueBeforeToday - totalPaidBeforeToday);
-
-    const installmentDueToday = paymentPlan.find(p => {
-        const installmentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
-        return installmentDateString === asOfDateString;
-    });
-    const isDueToday = !!installmentDueToday;
-    const originalDueTodayAmount = isDueToday ? (installmentDueToday?.amount || 0) : 0;
-
-    // La cuota del día se ajusta con el excedente de pagos anteriores.
-    const dueTodayAmount = Math.max(0, originalDueTodayAmount - surplusFromPast);
-
-    let lateDays = 0;
-    let firstUnpaidDate: string | undefined = undefined;
-
-    if (overdueAmount > 0.01) {
-        let cumulativeDue = 0;
-        const firstUnpaidInstallment = paymentPlan.find(p => {
-            const safePDate = toISOStringSafe(p.paymentDate);
-            if (!safePDate || isAfter(startOfDay(parseISO(safePDate)), asOfDate)) return false;
-            cumulativeDue += p.amount;
-            return totalPaid < cumulativeDue - 0.01;
-        });
-
-        if (firstUnpaidInstallment?.paymentDate) {
-            firstUnpaidDate = toISOStringSafe(firstUnpaidInstallment.paymentDate)!;
-            lateDays = differenceInDays(asOfDate, startOfDay(parseISO(firstUnpaidDate)));
-        }
+    if (lastPayment?.paymentDate) {
+      defaultReturn.lastPaymentDate = toISOStringSafe(lastPayment.paymentDate)!;
     }
-    
-    const currentLateFee = 0; // Se establece en 0 según solicitud del usuario
-    const { category: conamiCategory } = getProvisionCategory(lateDays);
-    const lastPaymentDate = lastPayment?.paymentDate ? toISOStringSafe(lastPayment.paymentDate)! : undefined;
+    return defaultReturn;
+  }
 
-    return {
-        remainingBalance,
-        overdueAmount,
-        lateDays: Math.max(0, lateDays),
-        currentLateFee,
-        lastPaymentDate,
-        isExpired,
-        isDueToday,
-        paidToday,
-        firstUnpaidDate,
-        conamiCategory,
-        totalInstallmentAmount: credit.totalInstallmentAmount,
-        dueTodayAmount,
-    };
+  // Continuar para créditos Activos
+  let asOfDate: Date;
+  if (asOfDateStr) {
+    if (typeof asOfDateStr === 'string') {
+      asOfDate = startOfDay(parseISO(asOfDateStr));
+    } else {
+      asOfDate = startOfDay(asOfDateStr);
+    }
+  } else {
+    asOfDate = startOfDay(parseISO(nowInNicaragua()));
+  }
+
+  const totalToPay = credit.totalAmount || 0;
+  const validPayments = registeredPayments.filter(p => p.status !== 'ANULADO');
+  const totalPaid = validPayments.reduce((sum, p) => sum + p.amount, 0);
+
+  let remainingBalance = Math.max(0, totalToPay - totalPaid);
+
+  if (remainingBalance < 0.01) {
+    const lastPayment = sortedValidPayments[0];
+    if (lastPayment?.paymentDate) {
+      defaultReturn.lastPaymentDate = toISOStringSafe(lastPayment.paymentDate)!;
+    }
+    defaultReturn.remainingBalance = 0;
+    return defaultReturn;
+  }
+
+  // --- LÓGICA DE FECHAS REFACTORIZADA PARA EVITAR ERRORES DE ZONA HORARIA ---
+  const asOfDateString = asOfDateStr ? formatDateForUser(asOfDateStr, 'yyyy-MM-dd') : todayInNicaragua();
+
+  const paidToday = validPayments
+    .filter(p => {
+      const paymentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
+      return paymentDateString === asOfDateString;
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const lastPayment = sortedValidPayments[0];
+  const safeDueDate = toISOStringSafe(credit.dueDate);
+  const isExpired = safeDueDate ? isBefore(parseISO(safeDueDate), asOfDate) : false;
+
+  const installmentsDueBeforeToday = paymentPlan
+    .filter(p => {
+      const installmentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
+      return installmentDateString && installmentDateString < asOfDateString;
+    });
+
+  const amountDueBeforeToday = installmentsDueBeforeToday.reduce((sum, p) => sum + p.amount, 0);
+
+  const totalPaidBeforeToday = validPayments
+    .filter(p => {
+      const paymentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
+      return paymentDateString && paymentDateString < asOfDateString;
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const surplusFromPast = Math.max(0, totalPaidBeforeToday - amountDueBeforeToday);
+
+  let overdueAmount = Math.max(0, amountDueBeforeToday - totalPaidBeforeToday);
+
+  const installmentDueToday = paymentPlan.find(p => {
+    const installmentDateString = formatDateForUser(p.paymentDate, 'yyyy-MM-dd');
+    return installmentDateString === asOfDateString;
+  });
+  const isDueToday = !!installmentDueToday;
+  const originalDueTodayAmount = isDueToday ? (installmentDueToday?.amount || 0) : 0;
+
+  // La cuota del día se ajusta con el excedente de pagos anteriores.
+  const dueTodayAmount = Math.max(0, originalDueTodayAmount - surplusFromPast);
+
+  let lateDays = 0;
+  let firstUnpaidDate: string | undefined = undefined;
+
+  if (overdueAmount > 0.01) {
+    let cumulativeDue = 0;
+    const firstUnpaidInstallment = paymentPlan.find(p => {
+      const safePDate = toISOStringSafe(p.paymentDate);
+      if (!safePDate || isAfter(startOfDay(parseISO(safePDate)), asOfDate)) return false;
+      cumulativeDue += p.amount;
+      return totalPaid < cumulativeDue - 0.01;
+    });
+
+    if (firstUnpaidInstallment?.paymentDate) {
+      firstUnpaidDate = toISOStringSafe(firstUnpaidInstallment.paymentDate)!;
+      lateDays = differenceInDays(asOfDate, startOfDay(parseISO(firstUnpaidDate)));
+    }
+  }
+
+  const currentLateFee = 0; // Se establece en 0 según solicitud del usuario
+  const { category: conamiCategory } = getProvisionCategory(lateDays);
+  const lastPaymentDate = lastPayment?.paymentDate ? toISOStringSafe(lastPayment.paymentDate)! : undefined;
+
+  return {
+    remainingBalance,
+    overdueAmount,
+    lateDays: Math.max(0, lateDays),
+    currentLateFee,
+    lastPaymentDate,
+    isExpired,
+    isDueToday,
+    paidToday,
+    firstUnpaidDate,
+    conamiCategory,
+    totalInstallmentAmount: credit.totalInstallmentAmount,
+    dueTodayAmount,
+  };
 }
 
 
@@ -692,60 +715,60 @@ export function generateFullStatement(credit: CreditDetail): FullStatement {
   const processedInstallments: ProcessedStatementInstallment[] = paymentPlan.map(installment => {
     const amountDuePreviously = cumulativeDueForPlan;
     cumulativeDueForPlan += installment.amount;
-    
+
     // Calcula cuánto de lo pagado hasta ahora se aplica a esta cuota.
     const paidForThisInstallment = Math.max(0, Math.min(installment.amount, totalPaid - amountDuePreviously));
     cumulativePaidForPlan += paidForThisInstallment;
-    
+
     const isPaidInFull = paidForThisInstallment >= installment.amount - 0.01;
     const safeInstallmentDate = toISOStringSafe(installment.paymentDate);
     if (!safeInstallmentDate) {
-        // Manejar caso de fecha de cuota inválida
-        return {
-            ...installment, paidAmount: 0, lateDays: 0, lateFee: 0, status: 'PENDIENTE'
-        }
+      // Manejar caso de fecha de cuota inválida
+      return {
+        ...installment, paidAmount: 0, lateDays: 0, lateFee: 0, status: 'PENDIENTE'
+      }
     }
     const installmentDate = parseISO(safeInstallmentDate);
 
     let lateDays = 0;
     if (isPaidInFull) {
-        // Si la cuota está pagada, encuentra qué pago la completó para calcular los días de atraso.
-        let tempCumulativePaid = 0;
-        let clearingPaymentDateStr: string | undefined = undefined;
-        for (const payment of sortedPayments) {
-            tempCumulativePaid += payment.amount;
-            if (tempCumulativePaid >= cumulativeDueForPlan - 0.01) {
-                clearingPaymentDateStr = toISOStringSafe(payment.paymentDate);
-                break;
-            }
+      // Si la cuota está pagada, encuentra qué pago la completó para calcular los días de atraso.
+      let tempCumulativePaid = 0;
+      let clearingPaymentDateStr: string | undefined = undefined;
+      for (const payment of sortedPayments) {
+        tempCumulativePaid += payment.amount;
+        if (tempCumulativePaid >= cumulativeDueForPlan - 0.01) {
+          clearingPaymentDateStr = toISOStringSafe(payment.paymentDate);
+          break;
         }
-        
-        if (clearingPaymentDateStr) {
-            const dateItWasPaid = parseISO(clearingPaymentDateStr);
-            const startOfPaidDate = startOfDay(dateItWasPaid);
-            const startOfDueDate = startOfDay(installmentDate);
+      }
 
-            if (isAfter(startOfPaidDate, startOfDueDate)) {
-                lateDays = differenceInDays(startOfPaidDate, startOfDueDate);
-            }
+      if (clearingPaymentDateStr) {
+        const dateItWasPaid = parseISO(clearingPaymentDateStr);
+        const startOfPaidDate = startOfDay(dateItWasPaid);
+        const startOfDueDate = startOfDay(installmentDate);
+
+        if (isAfter(startOfPaidDate, startOfDueDate)) {
+          lateDays = differenceInDays(startOfPaidDate, startOfDueDate);
         }
-    } else { 
-        // Si no está pagada y ya venció, calcula el atraso hasta hoy.
-        if (isBefore(installmentDate, today)) {
-             const startOfTodayDate = startOfDay(today);
-             const startOfDueDate = startOfDay(installmentDate);
-             lateDays = differenceInDays(startOfTodayDate, startOfDueDate);
-        }
+      }
+    } else {
+      // Si no está pagada y ya venció, calcula el atraso hasta hoy.
+      if (isBefore(installmentDate, today)) {
+        const startOfTodayDate = startOfDay(today);
+        const startOfDueDate = startOfDay(installmentDate);
+        lateDays = differenceInDays(startOfTodayDate, startOfDueDate);
+      }
     }
-    
+
     const lateFee = 0; // Establecido en 0 según solicitud
-    
+
     const installmentWithDetails: ProcessedStatementInstallment = {
-        ...installment,
-        paidAmount: paidForThisInstallment,
-        lateDays: lateDays,
-        lateFee: lateFee,
-        status: isPaidInFull ? 'PAGADA' : (isBefore(installmentDate, today) ? 'ATRASADA' : 'PENDIENTE'),
+      ...installment,
+      paidAmount: paidForThisInstallment,
+      lateDays: lateDays,
+      lateFee: lateFee,
+      status: isPaidInFull ? 'PAGADA' : (isBefore(installmentDate, today) ? 'ATRASADA' : 'PENDIENTE'),
     };
     return installmentWithDetails;
   });
@@ -759,7 +782,7 @@ export function generateFullStatement(credit: CreditDetail): FullStatement {
     pagado: totalPagado,
     saldo: totalCuota - totalPagado,
   };
-  
+
   const abonosTotals = {
     total: processedPayments.reduce((sum, p) => sum + p.amount, 0),
     capital: processedPayments.reduce((sum, p) => sum + p.principalApplied, 0),
@@ -843,62 +866,62 @@ export const numeroALetras = (num: number): string => {
     if (n < 2000000) return `UN MILLÓN ${convertir(n % 1000000)}`;
     return `${convertir(Math.floor(n / 1000000))} MILLONES ${convertir(n % 1000000)}`;
   };
-  
+
   if (num === null || num === undefined) return '';
   const entero = Math.floor(num);
   const centavos = Math.round((num - entero) * 100);
-  
+
   if (entero === 0) {
-      return `CERO CÓRDOBAS NETOS CON ${String(centavos).padStart(2, '0')}/100`;
+    return `CERO CÓRDOBAS NETOS CON ${String(centavos).padStart(2, '0')}/100`;
   }
-  
+
   let texto = convertir(entero);
-  
+
   return `${texto} CÓRDOBAS NETOS CON ${String(centavos).padStart(2, '0')}/100`;
 }
 
 
 export const translateCreditStatus = (status?: CreditStatus): string => {
-    if (!status) return 'Desconocido';
-    const statusMap: Record<CreditStatus, string> = {
-        'Active': 'Activo',
-        'Approved': 'Aprobado',
-        'Pending': 'Pendiente',
-        'Paid': 'Cancelado',
-        'Rejected': 'Rechazado',
-        'Expired': 'Expirado',
-        'Fallecido': 'Fallecido'
-    };
-    return statusMap[status] || status;
+  if (!status) return 'Desconocido';
+  const statusMap: Record<CreditStatus, string> = {
+    'Active': 'Activo',
+    'Approved': 'Aprobado',
+    'Pending': 'Pendiente',
+    'Paid': 'Cancelado',
+    'Rejected': 'Rechazado',
+    'Expired': 'Expirado',
+    'Fallecido': 'Fallecido'
+  };
+  return statusMap[status] || status;
 };
 
 // Robust date formatting function to be used across the app
 export const formatDate = (dateInput?: string | Date | number, formatStr: string = 'dd/MM/yyyy'): string => {
-    if (!dateInput) return 'N/A';
-    
-    try {
-        // Convertir number a Date si es necesario
-        if (typeof dateInput === 'number') {
-            return formatDateForUser(new Date(dateInput), formatStr);
-        }
-        return formatDateForUser(dateInput as string | Date, formatStr);
-    } catch (error) {
-        console.error('Error in formatDate:', error, 'Input:', dateInput);
-        return 'N/A';
+  if (!dateInput) return 'N/A';
+
+  try {
+    // Convertir number a Date si es necesario
+    if (typeof dateInput === 'number') {
+      return formatDateForUser(new Date(dateInput), formatStr);
     }
+    return formatDateForUser(dateInput as string | Date, formatStr);
+  } catch (error) {
+    console.error('Error in formatDate:', error, 'Input:', dateInput);
+    return 'N/A';
+  }
 };
 
 export const formatTime = (dateInput?: string | Date | number, formatStr: string = 'h:mm a'): string => {
-    if (!dateInput) return 'N/A';
-    
-    try {
-        // Convertir number a Date si es necesario
-        if (typeof dateInput === 'number') {
-            return formatDateForUser(new Date(dateInput), formatStr);
-        }
-        return formatDateForUser(dateInput as string | Date, formatStr);
-    } catch (error) {
-        console.error('Error in formatTime:', error, 'Input:', dateInput);
-        return 'N/A';
+  if (!dateInput) return 'N/A';
+
+  try {
+    // Convertir number a Date si es necesario
+    if (typeof dateInput === 'number') {
+      return formatDateForUser(new Date(dateInput), formatStr);
     }
+    return formatDateForUser(dateInput as string | Date, formatStr);
+  } catch (error) {
+    console.error('Error in formatTime:', error, 'Input:', dateInput);
+    return 'N/A';
+  }
 };
