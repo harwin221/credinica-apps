@@ -41,38 +41,23 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
         const pdfDoc = await PDFDocument.create();
         pdfDoc.registerFontkit(fontkit);
         
-        let logoImage: any = null;
-        let logoDims: any = null;
+        // Cargar logo CrediNica.png (REQUERIDO)
+        let logoImage: any;
+        let logoDims: any;
         
-        // Función para cargar logo con fallback a base64
-        const loadLogo = async (): Promise<void> => {
-            // Intentar cargar desde archivos locales (funciona en desarrollo y producción)
-            const possibleLogoPaths = [
-                path.join(process.cwd(), 'public', 'CrediNica.png'),
-                path.join(process.cwd(), 'public', 'CrediNica-inicial.png'),
-                path.resolve('./public/CrediNica.png'),
-                path.resolve('./public/CrediNica-inicial.png')
-            ];
+        try {
+            const logoPath = path.join(process.cwd(), 'public', 'CrediNica.png');
+            console.log('🔍 Intentando cargar logo desde:', logoPath);
             
-            for (const logoPath of possibleLogoPaths) {
-                try {
-                    await fs.access(logoPath);
-                    const logoBytes = await fs.readFile(logoPath);
-                    logoImage = await pdfDoc.embedPng(logoBytes);
-                    logoDims = logoImage.scale(0.15); // Aumentado de 0.05 a 0.15 para que se vea más grande
-                    
-                    console.log(`✅ Logo cargado exitosamente desde: ${logoPath}`);
-                    return;
-                } catch (error) {
-                    console.log(`⚠️ No se pudo cargar logo desde: ${logoPath}`);
-                    continue;
-                }
-            }
+            const logoBytes = await fs.readFile(logoPath);
+            logoImage = await pdfDoc.embedPng(logoBytes);
+            logoDims = logoImage.scale(0.2); // Tamaño del logo
             
-            console.warn('⚠️ Logo no encontrado en ninguna ruta, usando alternativo');
-        };
-        
-        await loadLogo();
+            console.log('✅ Logo CrediNica.png cargado exitosamente');
+        } catch (error) {
+            console.error('❌ ERROR: No se pudo cargar CrediNica.png desde public/', error);
+            throw new Error('Logo CrediNica.png no encontrado en la carpeta public/. Por favor, asegúrate de que el archivo existe.');
+        }
 
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -86,67 +71,13 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
         // --- Header Section ---
         const headerY = y;
         
-        // Header con logo o alternativa visual profesional
-        if (logoImage && logoDims) {
-            // Dibujar logo si está disponible
-            page1.drawImage(logoImage, {
-                x: margin,
-                y: headerY - logoDims.height + 10,
-                width: logoDims.width,
-                height: logoDims.height,
-            });
-        } else {
-            // Crear logo alternativo profesional
-            const logoWidth = 140;
-            const logoHeight = 35;
-            
-            // Dibujar rectángulo principal con gradiente simulado
-            page1.drawRectangle({
-                x: margin,
-                y: headerY - logoHeight,
-                width: logoWidth,
-                height: logoHeight,
-                color: rgb(0.1, 0.3, 0.7), // Azul oscuro
-            });
-            
-            // Dibujar borde superior más claro
-            page1.drawRectangle({
-                x: margin,
-                y: headerY - 3,
-                width: logoWidth,
-                height: 3,
-                color: rgb(0.2, 0.5, 0.9), // Azul más claro
-            });
-            
-            // Dibujar círculo decorativo
-            page1.drawCircle({
-                x: margin + 15,
-                y: headerY - logoHeight / 2,
-                size: 8,
-                color: rgb(1, 0.8, 0.2), // Dorado
-            });
-            
-            // Dibujar texto "CrediNica" 
-            const companyText = "CrediNica";
-            const companyTextWidth = fontBold.widthOfTextAtSize(companyText, 13);
-            page1.drawText(companyText, {
-                x: margin + 30,
-                y: headerY - logoHeight / 2 - 4,
-                size: 13,
-                font: fontBold,
-                color: rgb(1, 1, 1), // Blanco
-            });
-            
-            // Dibujar subtítulo
-            const subtitleText = "Microfinanzas";
-            page1.drawText(subtitleText, {
-                x: margin + 30,
-                y: headerY - logoHeight / 2 - 16,
-                size: 8,
-                font: font,
-                color: rgb(0.9, 0.9, 0.9), // Gris claro
-            });
-        }
+        // Dibujar logo CrediNica
+        page1.drawImage(logoImage, {
+            x: margin,
+            y: headerY - logoDims.height + 10,
+            width: logoDims.width,
+            height: logoDims.height,
+        });
 
         const titleText = "PAGARÉ A LA ORDEN";
         const titleWidth = fontBold.widthOfTextAtSize(titleText, 14);
@@ -167,9 +98,8 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
             size: 11 
         });
 
-        // Ajustar Y basado en si hay logo o no
-        const logoHeightUsed = logoDims ? logoDims.height : 35; // 35 es la altura del logo alternativo
-        y = headerY - logoHeightUsed - 30; // Increased space from 15 to 30
+        // Ajustar Y después del logo
+        y = headerY - logoDims.height - 30;
         // --- End Header Section ---
 
 
