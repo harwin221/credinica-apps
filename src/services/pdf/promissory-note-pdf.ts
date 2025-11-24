@@ -41,63 +41,34 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
         const pdfDoc = await PDFDocument.create();
         pdfDoc.registerFontkit(fontkit);
         
-        // Cargar logo CrediNica.png desde URL (funciona en Vercel)
-        let logoImage: any;
+        // Logo embebido en base64 (funciona en todos los entornos)
+        // TODO: Ejecutar "node scripts/convert-logo-to-base64.js" para generar el base64
+        // y reemplazar LOGO_BASE64 con el valor generado
+        const LOGO_BASE64 = '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...'; // Reemplazar con el base64 real
+            
+            let logoImage: any;
         let logoDims: any;
         
-        // Cargar logo desde filesystem (funciona en desarrollo y producción)
-        const possiblePaths = [
-            path.join(process.cwd(), 'public', 'CrediNica.png'),
-            path.join(process.cwd(), '.next', 'static', 'media', 'CrediNica.png'),
-            '/var/task/public/CrediNica.png', // Vercel serverless
-            '/var/task/.next/static/media/CrediNica.png',
-        ];
-        
-        let logoLoaded = false;
-        let lastError: any = null;
-        
-        for (const logoPath of possiblePaths) {
-            try {
-                console.log('🔍 Intentando:', logoPath);
+        try {
+            if (LOGO_BASE64 === 'PLACEHOLDER') {
+                // Intentar cargar desde filesystem (solo desarrollo)
+                console.log('⚠️ Logo base64 no configurado, intentando filesystem');
+                const logoPath = path.join(process.cwd(), 'public', 'CrediNica.png');
                 const logoBytes = await fs.readFile(logoPath);
-                console.log('✅ Archivo leído:', logoBytes.length, 'bytes');
-                
-                // Intentar embedPng primero
-                try {
-                    logoImage = await pdfDoc.embedPng(logoBytes);
-                    console.log('✅ Embebido como PNG');
-                } catch (pngError) {
-                    console.log('⚠️ Intentando como JPG');
-                    logoImage = await pdfDoc.embedJpg(logoBytes);
-                    console.log('✅ Embebido como JPG');
-                }
-                
+                logoImage = await pdfDoc.embedPng(logoBytes);
                 logoDims = logoImage.scale(0.2);
-                logoLoaded = true;
-                console.log('✅ Logo cargado desde:', logoPath);
-                break;
-            } catch (error: any) {
-                lastError = error;
-                console.log('❌ Falló:', logoPath, '-', error.message);
-                continue;
+                console.log('✅ Logo cargado desde filesystem (desarrollo)');
+            } else {
+                // Usar logo embebido en base64 (producción)
+                console.log('📦 Usando logo embebido en base64');
+                const logoBytes = Buffer.from(LOGO_BASE64, 'base64');
+                logoImage = await pdfDoc.embedPng(logoBytes);
+                logoDims = logoImage.scale(0.2);
+                console.log('✅ Logo embebido cargado');
             }
-        }
-        
-        if (!logoLoaded) {
-            console.error('❌ No se pudo cargar el logo desde ninguna ruta');
-            console.error('Último error:', lastError);
-            console.error('CWD:', process.cwd());
-            
-            // Listar archivos disponibles para debug
-            try {
-                const publicDir = path.join(process.cwd(), 'public');
-                const files = await fs.readdir(publicDir);
-                console.log('📁 Archivos en public/:', files);
-            } catch (e) {
-                console.log('No se pudo listar public/');
-            }
-            
-            throw new Error(`No se pudo cargar el logo CrediNica.png. Último error: ${lastError?.message}`);
+        } catch (error: any) {
+            console.error('❌ ERROR al cargar logo:', error);
+            throw new Error(`No se pudo cargar el logo: ${error.message}. Por favor, ejecuta "node scripts/convert-logo-to-base64.js" y actualiza el código.`);
         }
 
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
