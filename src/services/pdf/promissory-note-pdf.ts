@@ -45,62 +45,59 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
         let logoImage: any;
         let logoDims: any;
         
-        try {
-            // En producción (Vercel), usar URL del logo
-            if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
-                console.log('🌐 Cargando logo desde URL (producción)');
-                // Construir URL del logo desde el dominio actual
-                const baseUrl = process.env.VERCEL_URL 
-                    ? `https://${process.env.VERCEL_URL}`
-                    : process.env.NEXT_PUBLIC_VERCEL_URL
-                    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-                    : 'https://credinica-app.vercel.app'; // Fallback
-                
-                const logoUrl = `${baseUrl}/CrediNica.png`;
-                
-                console.log('🔍 URL del logo:', logoUrl);
-                const response = await fetch(logoUrl);
-                console.log('📡 Response status:', response.status);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const logoBytes = await response.arrayBuffer();
-                console.log('📦 Logo bytes recibidos:', logoBytes.byteLength);
-                
-                // Intentar embedPng
-                try {
-                    logoImage = await pdfDoc.embedPng(logoBytes);
-                    console.log('✅ Logo embebido como PNG');
-                } catch (pngError) {
-                    console.log('⚠️ Error con PNG, intentando como JPG:', pngError);
-                    // Si falla como PNG, intentar como JPG
-                    logoImage = await pdfDoc.embedJpg(logoBytes);
-                    console.log('✅ Logo embebido como JPG');
-                }
-                
-                logoDims = logoImage.scale(0.2);
-                console.log('✅ Logo cargado desde URL');
-            } else {
-                // En desarrollo, leer desde filesystem
-                console.log('📁 Cargando logo desde filesystem (desarrollo)');
-                const logoPath = path.join(process.cwd(), 'public', 'CrediNica.png');
+        // Cargar logo desde filesystem (funciona en desarrollo y producción)
+        const possiblePaths = [
+            path.join(process.cwd(), 'public', 'CrediNica.png'),
+            path.join(process.cwd(), '.next', 'static', 'media', 'CrediNica.png'),
+            '/var/task/public/CrediNica.png', // Vercel serverless
+            '/var/task/.next/static/media/CrediNica.png',
+        ];
+        
+        let logoLoaded = false;
+        let lastError: any = null;
+        
+        for (const logoPath of possiblePaths) {
+            try {
+                console.log('🔍 Intentando:', logoPath);
                 const logoBytes = await fs.readFile(logoPath);
+                console.log('✅ Archivo leído:', logoBytes.length, 'bytes');
                 
+                // Intentar embedPng primero
                 try {
                     logoImage = await pdfDoc.embedPng(logoBytes);
+                    console.log('✅ Embebido como PNG');
                 } catch (pngError) {
+                    console.log('⚠️ Intentando como JPG');
                     logoImage = await pdfDoc.embedJpg(logoBytes);
+                    console.log('✅ Embebido como JPG');
                 }
                 
                 logoDims = logoImage.scale(0.2);
-                console.log('✅ Logo cargado desde filesystem');
+                logoLoaded = true;
+                console.log('✅ Logo cargado desde:', logoPath);
+                break;
+            } catch (error: any) {
+                lastError = error;
+                console.log('❌ Falló:', logoPath, '-', error.message);
+                continue;
             }
-        } catch (error: any) {
-            console.error('❌ ERROR al cargar logo:', error);
-            console.error('Stack:', error.stack);
-            throw new Error(`No se pudo cargar el logo CrediNica.png: ${error.message}`);
+        }
+        
+        if (!logoLoaded) {
+            console.error('❌ No se pudo cargar el logo desde ninguna ruta');
+            console.error('Último error:', lastError);
+            console.error('CWD:', process.cwd());
+            
+            // Listar archivos disponibles para debug
+            try {
+                const publicDir = path.join(process.cwd(), 'public');
+                const files = await fs.readdir(publicDir);
+                console.log('📁 Archivos en public/:', files);
+            } catch (e) {
+                console.log('No se pudo listar public/');
+            }
+            
+            throw new Error(`No se pudo cargar el logo CrediNica.png. Último error: ${lastError?.message}`);
         }
 
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
