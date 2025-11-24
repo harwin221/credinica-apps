@@ -8,11 +8,11 @@ import { fromZonedTime } from 'date-fns-tz';
 import { toISOString, nowInNicaragua, toNicaraguaTime } from '@/lib/date-utils';
 
 export interface DailyTransaction {
-  id: string;
-  type: 'Payment' | 'Disbursement';
-  amount: number;
-  description: string;
-  timestamp: string; // ISO string
+    id: string;
+    type: 'Payment' | 'Disbursement';
+    amount: number;
+    description: string;
+    timestamp: string; // ISO string
 }
 
 export interface DailyActivitySummary {
@@ -36,7 +36,7 @@ export async function generateDailyActivityReport(userId: string): Promise<Daily
     const nowInManagua = toNicaraguaTime(nowInNicaragua());
     const startOfDayInManagua = startOfDay(nowInManagua);
     const endOfDayInManagua = endOfDay(nowInManagua);
-    
+
     // Convertir a UTC para la consulta a la base de datos (MySQL suele trabajar mejor con UTC)
     const startOfDayUTC = fromZonedTime(startOfDayInManagua, timeZone);
     const endOfDayUTC = fromZonedTime(endOfDayInManagua, timeZone);
@@ -88,4 +88,20 @@ export async function generateDailyActivityReport(userId: string): Promise<Daily
         collections,
         disbursements,
     };
+}
+
+import { getSession } from '@/app/(auth)/login/actions';
+
+export async function deleteClosure(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const session = await getSession();
+        if (!session || session.role !== 'ADMINISTRADOR') {
+            return { success: false, error: 'No tiene permisos para eliminar arqueos.' };
+        }
+        await query('DELETE FROM closures WHERE id = ?', [id]);
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting closure:', error);
+        return { success: false, error: 'Ocurrió un error al eliminar el arqueo.' };
+    }
 }
