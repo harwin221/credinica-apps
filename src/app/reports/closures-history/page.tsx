@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, ArrowLeft, FilterX, Calendar as CalendarIcon, Search, Eye, Trash2 } from 'lucide-react';
+import { Loader2, ArrowLeft, FilterX, Calendar as CalendarIcon, Search, Eye, Trash2, MoreHorizontal } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -20,6 +20,14 @@ import { Calendar } from '@/components/ui/calendar';
 import { useDebounce } from 'use-debounce';
 import { Input } from '@/components/ui/input';
 import { ClosureDetailDialog } from './components/ClosureDetailDialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { format } from 'date-fns';
 
 const ALLOWED_ROLES: UserRole[] = ['ADMINISTRADOR', 'OPERATIVO', 'FINANZAS', 'GERENTE'];
@@ -153,30 +161,41 @@ export default function ClosuresHistoryPage() {
                                             </TableCell>
                                             <TableCell>{c.closedByUserName}</TableCell>
                                             <TableCell className="text-right">
-                                                <Button variant="outline" size="sm" onClick={() => setSelectedClosure(c)}>
-                                                    <Eye className="mr-2 h-4 w-4" /> Ver Detalles
-                                                </Button>
-                                                {user?.role === 'ADMINISTRADOR' && (
-                                                    <Button
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        className="ml-2"
-                                                        onClick={() => {
-                                                            if (confirm('¿Estás seguro de que deseas eliminar este arqueo? Esta acción no se puede deshacer.')) {
-                                                                deleteClosure(c.id || '').then(res => {
-                                                                    if (res.success) {
-                                                                        toast({ title: 'Éxito', description: 'Arqueo eliminado correctamente.' });
-                                                                        setClosures(prev => prev.filter(item => item.id !== c.id));
-                                                                    } else {
-                                                                        toast({ title: 'Error', description: res.error || 'Error al eliminar.', variant: 'destructive' });
-                                                                    }
-                                                                });
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                )}
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                            <span className="sr-only">Abrir menú</span>
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => setSelectedClosure(c)}>
+                                                            <Eye className="mr-2 h-4 w-4" /> Ver Detalles
+                                                        </DropdownMenuItem>
+                                                        {user?.role === 'ADMINISTRADOR' && (
+                                                            <>
+                                                                <DropdownMenuItem
+                                                                    className="text-destructive focus:text-destructive"
+                                                                    onClick={() => {
+                                                                        if (confirm('¿Estás seguro de que deseas eliminar este arqueo? Esta acción no se puede deshacer.')) {
+                                                                            deleteClosure(c.id || '').then(res => {
+                                                                                if (res.success) {
+                                                                                    toast({ title: 'Éxito', description: 'Arqueo eliminado correctamente.' });
+                                                                                    setClosures(prev => prev.filter(item => item.id !== c.id));
+                                                                                } else {
+                                                                                    toast({ title: 'Error', description: res.error || 'Error al eliminar.', variant: 'destructive' });
+                                                                                }
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </TableCell>
                                         </TableRow>
                                     ))
