@@ -756,7 +756,8 @@ export async function generateDisbursementsReport(filters: ReportFilters): Promi
         if (Array.isArray(userNamesResult) && userNamesResult.length > 0) {
             const userNames = userNamesResult.map(u => u.fullName);
             const namePlaceholders = userNames.map(() => '?').join(',');
-            sql += ` AND c.disbursedBy IN (${namePlaceholders})`;
+            // CORRECCIÓN: Filtrar por collectionsManager para coincidir con el reporte de Colocación
+            sql += ` AND c.collectionsManager IN (${namePlaceholders})`;
             params.push(...userNames);
         }
     }
