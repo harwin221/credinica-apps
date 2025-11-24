@@ -12,9 +12,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { purgeAuditLogs } from './actions';
+import { purgeAuditLogs, getAuditLogs } from './actions';
 import { useToast } from '@/hooks/use-toast';
-import { clientQuery } from '@/lib/mysql-client';
 
 
 const ALLOWED_ROLES: UserRole[] = ['ADMINISTRADOR', 'GERENTE', 'SUPERVISOR', 'FINANZAS'];
@@ -45,16 +44,16 @@ export default function AuditLogPage() {
         if (!canView) return;
         setIsLoading(true);
         try {
-            const logData: any = await clientQuery("SELECT * FROM audit_logs ORDER BY timestamp DESC");
-            
+            const logData = await getAuditLogs();
+
             setLogs(logData.map((log: any) => ({
                 ...log,
                 timestamp: new Date(log.timestamp).toISOString(),
             })));
 
         } catch (error) {
-            console.error("Error fetching audit logs from MySQL:", error);
-            toast({ title: 'Error', description: 'No se pudieron cargar los registros de auditoría.', variant: 'destructive'});
+            console.error("Error fetching audit logs:", error);
+            toast({ title: 'Error', description: 'No se pudieron cargar los registros de auditoría.', variant: 'destructive' });
         } finally {
             setIsLoading(false);
         }
@@ -78,14 +77,14 @@ export default function AuditLogPage() {
         setIsPurging(true);
         try {
             const result = await purgeAuditLogs(user);
-            if(result.success) {
+            if (result.success) {
                 toast({ title: 'Registros Purgados', description: 'Todos los registros de auditoría han sido eliminados.', variant: 'info' });
                 fetchLogs();
             } else {
                 throw new Error(result.error);
             }
         } catch (error: any) {
-            toast({ title: 'Error', description: error.message || 'No se pudieron purgar los registros.', variant: 'destructive'});
+            toast({ title: 'Error', description: error.message || 'No se pudieron purgar los registros.', variant: 'destructive' });
         } finally {
             setIsPurging(false);
             setIsPurgeConfirmOpen(false);
@@ -102,89 +101,89 @@ export default function AuditLogPage() {
 
     return (
         <>
-        <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-end items-center">
-                         {canPurge && (
-                            <Button variant="destructive" onClick={() => setIsPurgeConfirmOpen(true)} disabled={isPurging}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                {isPurging ? 'Purgando...' : 'Purgar Registros'}
-                            </Button>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {isLoading ? (
-                        <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-                    ) : (
-                        <>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Fecha y Hora</TableHead>
-                                    <TableHead>Usuario</TableHead>
-                                    <TableHead>Acción</TableHead>
-                                    <TableHead>Detalles</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {paginatedLogs.length > 0 ? (
-                                    paginatedLogs.map(log => (
-                                        <TableRow key={log.id}>
-                                            <TableCell className="text-muted-foreground">{formatDate(log.timestamp)}</TableCell>
-                                            <TableCell className="font-medium">{log.userName}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <History className="h-4 w-4 text-gray-500" />
-                                                    <span className="font-mono text-xs">{log.action}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-sm">{log.details}</TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">
-                                            No se encontraron registros de auditoría.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                         <div className="flex items-center justify-end space-x-2 py-4">
-                            <span className="text-sm text-muted-foreground">Página {currentPage} de {maxPage}</span>
-                            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
-                            <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(maxPage, p + 1))} disabled={currentPage >= maxPage}>
-                                Siguiente <ArrowRight className="h-4 w-4 ml-1" />
-                            </Button>
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader>
+                        <div className="flex justify-end items-center">
+                            {canPurge && (
+                                <Button variant="destructive" onClick={() => setIsPurgeConfirmOpen(true)} disabled={isPurging}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    {isPurging ? 'Purgando...' : 'Purgar Registros'}
+                                </Button>
+                            )}
                         </div>
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {isLoading ? (
+                            <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                        ) : (
+                            <>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Fecha y Hora</TableHead>
+                                            <TableHead>Usuario</TableHead>
+                                            <TableHead>Acción</TableHead>
+                                            <TableHead>Detalles</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {paginatedLogs.length > 0 ? (
+                                            paginatedLogs.map(log => (
+                                                <TableRow key={log.id}>
+                                                    <TableCell className="text-muted-foreground">{formatDate(log.timestamp)}</TableCell>
+                                                    <TableCell className="font-medium">{log.userName}</TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <History className="h-4 w-4 text-gray-500" />
+                                                            <span className="font-mono text-xs">{log.action}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-sm">{log.details}</TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="h-24 text-center">
+                                                    No se encontraron registros de auditoría.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                                <div className="flex items-center justify-end space-x-2 py-4">
+                                    <span className="text-sm text-muted-foreground">Página {currentPage} de {maxPage}</span>
+                                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                                        <ArrowLeft className="h-4 w-4 mr-1" /> Anterior
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(maxPage, p + 1))} disabled={currentPage >= maxPage}>
+                                        Siguiente <ArrowRight className="h-4 w-4 ml-1" />
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
 
-         <AlertDialog open={isPurgeConfirmOpen} onOpenChange={setIsPurgeConfirmOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>¿Está absolutamente seguro?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Esta acción es irreversible y eliminará **todos** los registros de auditoría del sistema de forma permanente.
-                        Esta operación no se puede deshacer.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handlePurge} className="bg-destructive hover:bg-destructive/90">
-                         {isPurging && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Sí, purgar todo
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+            <AlertDialog open={isPurgeConfirmOpen} onOpenChange={setIsPurgeConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Está absolutamente seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción es irreversible y eliminará **todos** los registros de auditoría del sistema de forma permanente.
+                            Esta operación no se puede deshacer.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handlePurge} className="bg-destructive hover:bg-destructive/90">
+                            {isPurging && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Sí, purgar todo
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }
