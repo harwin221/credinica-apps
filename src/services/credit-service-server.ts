@@ -18,6 +18,7 @@ import {
 } from '@/lib/date-utils';
 import { getUser, getUserByName } from './user-service-server';
 import { getClient } from './client-service-server';
+import { hasUserClosedDay } from './closure-service';
 
 // Helper to safely convert different date formats to ISO string
 const toISOStringSafe = (date: any): string | undefined => {
@@ -63,7 +64,7 @@ export async function addCredit(creditData: Partial<CreditApplication> & { deliv
 
         // Importar la nueva función
         const { isoToMySQLDateTimeNoon } = await import('@/lib/date-utils');
-        
+
         await query(creditSql, [
             newCreditId, creditNumber, clientId, clientName, initialStatus,
             isoToMySQLDateTime(applicationDate), // Hora exacta de solicitud
@@ -130,7 +131,7 @@ export async function updateCredit(id: string, creditData: Partial<CreditDetail>
             if (creditRows.length === 0) {
                 return { success: false, error: 'Crédito no encontrado.' };
             }
-            
+
             if (creditRows[0].branch !== actor.sucursal) {
                 return { success: false, error: 'No tienes permisos para editar este crédito.' };
             }
@@ -171,7 +172,7 @@ export async function updateCredit(id: string, creditData: Partial<CreditDetail>
 
             // Convertir fechas a formato MySQL si existen
             const { isoToMySQLDateTimeNoon } = await import('@/lib/date-utils');
-            
+
             if (filteredFields.deliveryDate && typeof filteredFields.deliveryDate === 'string') {
                 // deliveryDate usa mediodía (fecha sin hora específica)
                 filteredFields.deliveryDate = isoToMySQLDateTimeNoon(filteredFields.deliveryDate);
@@ -305,6 +306,12 @@ export async function getClientCredits(clientId: string): Promise<CreditDetail[]
 
 export async function addPayment(creditId: string, paymentData: Omit<RegisteredPayment, 'id'>, actor: User): Promise<{ success: boolean; error?: string, paymentId?: string }> {
     try {
+        // Verificar si el usuario ya cerró caja hoy
+        const hasClosed = await hasUserClosedDay(actor.id);
+        if (hasClosed) {
+            return { success: false, error: 'Acción bloqueada: Ya has realizado el cierre de caja de hoy. No puedes registrar más pagos.' };
+        }
+
         const paymentId = `pay_${Date.now()}`;
         const sql = 'INSERT INTO payments_registered (id, creditId, paymentDate, amount, managedBy, transactionNumber, status) VALUES (?, ?, ?, ?, ?, ?, ?)';
 

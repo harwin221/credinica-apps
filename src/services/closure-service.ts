@@ -105,3 +105,23 @@ export async function deleteClosure(id: string): Promise<{ success: boolean; err
         return { success: false, error: 'Ocurrió un error al eliminar el arqueo.' };
     }
 }
+
+export async function hasUserClosedDay(userId: string, date: Date = new Date()): Promise<boolean> {
+    try {
+        const timeZone = 'America/Managua';
+        const dateInManagua = toNicaraguaTime(date);
+        const start = fromZonedTime(startOfDay(dateInManagua), timeZone);
+        const end = fromZonedTime(endOfDay(dateInManagua), timeZone);
+
+        const rows: any = await query(
+            'SELECT id FROM closures WHERE userId = ? AND closureDate >= ? AND closureDate <= ? LIMIT 1',
+            [userId, start, end]
+        );
+
+        return rows.length > 0;
+    } catch (error) {
+        console.error('Error checking for user closure:', error);
+        // En caso de error, asumimos false para no bloquear operaciones, pero logueamos el error
+        return false;
+    }
+}
