@@ -2,9 +2,7 @@
 'use server';
 
 import * as React from 'react';
-import { cookies } from 'next/headers';
-import { decrypt } from '@/app/(auth)/login/actions';
-import { getUser as getUserServerSide } from '@/services/user-service-server';
+import { getSession } from '@/app/(auth)/login/actions';
 import { getPortfolioForGestor } from '@/services/portfolio-service';
 import { getSucursales } from '@/services/sucursal-service';
 import { generateColocacionVsRecuperacionReport } from '@/services/report-service';
@@ -13,24 +11,8 @@ import { DefaultDashboard } from '@/app/dashboard/components/DefaultDashboard';
 import { GestorDashboard } from './components/GestorDashboard';
 import { format } from 'date-fns';
 
-async function getUserFromSession() {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('session')?.value;
-    if (!sessionCookie) return null;
-
-    try {
-        const decryptedSession = await decrypt(sessionCookie);
-        if (!decryptedSession?.userId) return null;
-        const user = await getUserServerSide(decryptedSession.userId);
-        return user;
-    } catch (error) {
-        console.error("Error getting user from session:", error);
-        return null;
-    }
-}
-
 export default async function DashboardPage() {
-    const user = await getUserFromSession();
+    const user = await getSession();
 
     if (!user) {
         return <DefaultDashboard user={{ fullName: 'Invitado', role: '' } as any} />;
@@ -52,9 +34,9 @@ export default async function DashboardPage() {
         case 'FINANZAS':
         case 'OPERATIVO': {
             const initialSucursales = await getSucursales();
-            
+
             const sucursalesFilter = (user.role === 'ADMINISTRADOR' || user.role === 'FINANZAS') ? undefined : [user.sucursal || ''];
-            
+
             const initialReportData = await generateColocacionVsRecuperacionReport({
                 sucursales: sucursalesFilter,
                 dateFrom: todayNic,

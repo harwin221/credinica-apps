@@ -110,6 +110,18 @@ export async function getSession(): Promise<AppUser | null> {
   try {
     // Obtener el perfil de usuario completo y actualizado de la base de datos
     const userProfile = await getUserProfileFromDatabase(decryptedSession.userId);
+
+    if (userProfile) {
+      // VERIFICACIÓN DE CONTROL DE ACCESO (EN CADA REQUEST)
+      const { checkAccess } = await import('@/services/settings-service');
+      const accessCheck = await checkAccess(userProfile.role, userProfile.sucursal);
+
+      if (!accessCheck.allowed) {
+        console.warn(`[Acceso Denegado] Usuario ${userProfile.email} bloqueado en tiempo real: ${accessCheck.reason}`);
+        return null;
+      }
+    }
+
     return userProfile;
   } catch (error) {
     console.error('Error obteniendo perfil de usuario:', error);
