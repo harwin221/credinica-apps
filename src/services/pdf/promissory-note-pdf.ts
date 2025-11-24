@@ -60,10 +60,26 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
                 
                 console.log('🔍 URL del logo:', logoUrl);
                 const response = await fetch(logoUrl);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                console.log('📡 Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
                 
                 const logoBytes = await response.arrayBuffer();
-                logoImage = await pdfDoc.embedPng(logoBytes);
+                console.log('📦 Logo bytes recibidos:', logoBytes.byteLength);
+                
+                // Intentar embedPng
+                try {
+                    logoImage = await pdfDoc.embedPng(logoBytes);
+                    console.log('✅ Logo embebido como PNG');
+                } catch (pngError) {
+                    console.log('⚠️ Error con PNG, intentando como JPG:', pngError);
+                    // Si falla como PNG, intentar como JPG
+                    logoImage = await pdfDoc.embedJpg(logoBytes);
+                    console.log('✅ Logo embebido como JPG');
+                }
+                
                 logoDims = logoImage.scale(0.2);
                 console.log('✅ Logo cargado desde URL');
             } else {
@@ -71,13 +87,20 @@ export async function generatePromissoryNotePdf(creditId: string): Promise<Docum
                 console.log('📁 Cargando logo desde filesystem (desarrollo)');
                 const logoPath = path.join(process.cwd(), 'public', 'CrediNica.png');
                 const logoBytes = await fs.readFile(logoPath);
-                logoImage = await pdfDoc.embedPng(logoBytes);
+                
+                try {
+                    logoImage = await pdfDoc.embedPng(logoBytes);
+                } catch (pngError) {
+                    logoImage = await pdfDoc.embedJpg(logoBytes);
+                }
+                
                 logoDims = logoImage.scale(0.2);
                 console.log('✅ Logo cargado desde filesystem');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ ERROR al cargar logo:', error);
-            throw new Error('No se pudo cargar el logo CrediNica.png. Verifica que el archivo existe en public/');
+            console.error('Stack:', error.stack);
+            throw new Error(`No se pudo cargar el logo CrediNica.png: ${error.message}`);
         }
 
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
