@@ -21,6 +21,7 @@ export const addHoliday = async (holidayData: Omit<Holiday, 'id'>, actor: User):
     try {
         const newId = `hol_${Date.now()}`;
         const soloFecha = holidayData.date.split('T')[0];
+        console.log(soloFecha);
         await query('INSERT INTO holidays (id, name, date) VALUES (?, ?, ?)', [newId, holidayData.name, soloFecha]);
         await createLog(actor, 'settings:holiday_add', `Agregó el feriado ${holidayData.name} para la fecha ${holidayData.date}.`, { targetId: newId });
         revalidatePath('/settings/holidays');
