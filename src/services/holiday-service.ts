@@ -20,9 +20,9 @@ export const getHolidays = async (): Promise<Holiday[]> => {
 export const addHoliday = async (holidayData: Omit<Holiday, 'id'>, actor: User): Promise<{ success: boolean, id?: string, error?: string }> => {
     try {
         const newId = `hol_${Date.now()}`;
-        const soloFecha = holidayData.date.split('T')[0];
-        console.log(soloFecha);
-        await query('INSERT INTO holidays (id, name, date) VALUES (?, ?, ?)', [newId, holidayData.name, soloFecha]);
+        // const soloFecha = holidayData.date.split('T')[0];
+        // console.log(soloFecha);
+        await query('INSERT INTO holidays (id, name, date) VALUES (?, ?, ?)', [newId, holidayData.name, holidayData.date]);
         await createLog(actor, 'settings:holiday_add', `Agregó el feriado ${holidayData.name} para la fecha ${holidayData.date}.`, { targetId: newId });
         revalidatePath('/settings/holidays');
         return { success: true, id: newId };
